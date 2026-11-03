@@ -30,10 +30,13 @@ import {
   FileText,
   FileDiff,
   Layers,
+  GitFork,
+  Cpu,
   Plug,
   MonitorPlay,
   Power,
   Palette,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,13 +59,13 @@ import { AgentDefinitionsSettings } from './agent-definitions-settings';
 import { WorkProfilesSettings } from './work-profiles-settings';
 import { SavedWorkflowsSettings } from './saved-workflows-settings';
 import { BackupRecoverySettings } from './backup-recovery-settings';
-import { ConnectAgentView } from '@/components/connect/connect-agent-view';
+import { LegacyMigrationModal } from './legacy-migration-modal';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { eventToMessage } from '@/lib/types';
 import type { RightPanelTab } from '@/components/layout/layout-context';
 
 export function SettingsView() {
-  const { workspace, token, refreshWorkspace, agents, currentSessionId, setSessionMaster, addParticipant, removeParticipant, sessions } = useWorkspace();
+  const { workspace, token, refreshWorkspace, agents, currentSessionId, setSessionMaster, addParticipant, removeParticipant, sessions, createSession } = useWorkspace();
   const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
   const { setViewMode, canGoBack, goBack, settingsTab, setSettingsTab, activeRightTab, setActiveRightTab, splitBrowser, setSplitBrowser, setSelectedAgentName } = useLayout();
   const [name, setName] = useState(workspace?.name || '52hz');
@@ -104,8 +107,22 @@ export function SettingsView() {
   const [autostart, setAutostart] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [agentSubTab, setAgentSubTab] = useState<'agents' | 'connections'>('agents');
-  const [showConnectAgent, setShowConnectAgent] = useState(false);
+  const [agentSubTab, setAgentSubTab] = useState<'agents' | 'profiles' | 'workflows' | 'connections'>('agents');
+  const [migrationOpen, setMigrationOpen] = useState(false);
+  const [migrationIssueCount, setMigrationIssueCount] = useState(0);
+
+  const checkMigration = useCallback(async () => {
+    try {
+      const res = await workspaceApi.checkLegacyMigration();
+      setMigrationIssueCount(res?.stats?.totalIssues || 0);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    if (settingsTab === 'agents') {
+      void checkMigration();
+    }
+  }, [settingsTab, checkMigration]);
   const [markColor, setMarkColor] = useMarkColor();
   const [localRuntime,setLocalRuntime] = useState<boolean|null>(null);
   const embeddedRuntime = localRuntime === true || agents.some(agent => agent.agentType === 'embedded');
@@ -261,7 +278,6 @@ export function SettingsView() {
               <button
                 key={item.id}
                 onClick={() => {
-                  setShowConnectAgent(false);
                   setSettingsTab(item.id);
                 }}
                 className={cn(
@@ -534,30 +550,120 @@ export function SettingsView() {
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
               {localRuntime === null ? (
                 <p className="text-xs text-foreground-muted">正在加载 Agent 设置…</p>
-              ) : agentSubTab === 'connections' ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                    <button
-                      onClick={() => setAgentSubTab('agents')}
-                      className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium"
-                    >
-                      <ArrowLeft className="size-3.5" />
-                      <span>返回 Agent 列表</span>
-                    </button>
-                    <h3 className="text-xs font-semibold text-foreground">底层执行资源连接 (Models & Connections)</h3>
-                  </div>
-                  <RouterProviderSettings />
-                </div>
               ) : (
-                <AgentDefinitionsSettings
-                  onManageConnections={() => setAgentSubTab('connections')}
-                  onSelectAgentForChat={(agentId) => {
-                    if (currentSessionId) {
-                      void workspaceApi.assignSessionAgent(currentSessionId, agentId).catch(() => {});
-                    }
-                    setViewMode('threads');
-                  }}
-                />
+                <div className="space-y-5">
+                  {/* Secondary Sub-tab Navigation */}
+                  <div className="flex items-center gap-1.5 p-1 bg-surface2/60 rounded-xl border border-border/60 select-none overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={() => setAgentSubTab('agents')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-1.5 shrink-0",
+                        agentSubTab === 'agents' ? "bg-surface0 text-foreground shadow-xs font-semibold" : "text-foreground-muted hover:text-foreground"
+                      )}
+                    >
+                      <Bot className="size-3.5 text-primary" />
+                      <span>Agent 管理</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAgentSubTab('profiles')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-1.5 shrink-0",
+                        agentSubTab === 'profiles' ? "bg-surface0 text-foreground shadow-xs font-semibold" : "text-foreground-muted hover:text-foreground"
+                      )}
+                    >
+                      <Layers className="size-3.5 text-primary" />
+                      <span>协作工作配置</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAgentSubTab('workflows')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-1.5 shrink-0",
+                        agentSubTab === 'workflows' ? "bg-surface0 text-foreground shadow-xs font-semibold" : "text-foreground-muted hover:text-foreground"
+                      )}
+                    >
+                      <GitFork className="size-3.5 text-primary" />
+                      <span>流水线工作流</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAgentSubTab('connections')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-1.5 shrink-0 sm:ml-auto",
+                        agentSubTab === 'connections' ? "bg-surface0 text-foreground shadow-xs font-semibold" : "text-foreground-muted hover:text-foreground"
+                      )}
+                    >
+                      <Cpu className="size-3.5 text-primary" />
+                      <span>资源连接维护</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMigrationOpen(true)}
+                      className={cn(
+                        "px-2.5 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-1.5 shrink-0",
+                        migrationIssueCount > 0
+                          ? "bg-status-warning/15 text-status-warning border border-status-warning/40 font-semibold"
+                          : "text-foreground-muted hover:text-foreground"
+                      )}
+                      title="检查并迁移旧角色与非 Agent 配置引用"
+                    >
+                      <ShieldAlert className="size-3.5 text-status-warning" />
+                      <span>旧配置迁移</span>
+                      {migrationIssueCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-3xs font-mono bg-status-warning text-black font-bold">
+                          {migrationIssueCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Sub-tab Content Panels */}
+                  {agentSubTab === 'agents' && (
+                    <AgentDefinitionsSettings
+                      onManageConnections={() => setAgentSubTab('connections')}
+                      onSelectAgentForChat={async (agentId) => {
+                        try {
+                          await createSession({ agentId });
+                          setViewMode('threads');
+                        } catch {
+                          toast.error('无法为该 Agent 开启新会话');
+                        }
+                      }}
+                    />
+                  )}
+
+                  {agentSubTab === 'profiles' && (
+                    <WorkProfilesSettings />
+                  )}
+
+                  {agentSubTab === 'workflows' && (
+                    <SavedWorkflowsSettings />
+                  )}
+
+                  {agentSubTab === 'connections' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                        <button
+                          onClick={() => setAgentSubTab('agents')}
+                          className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium"
+                        >
+                          <ArrowLeft className="size-3.5" />
+                          <span>返回 Agent 列表</span>
+                        </button>
+                        <h3 className="text-xs font-semibold text-foreground">执行资源连接</h3>
+                      </div>
+                      <p className="text-xs leading-5 text-foreground-muted">连接为 Agent 提供执行资源，可被多个成员复用。添加连接后，请返回 Agent 设置完成绑定。</p>
+                      <RouterProviderSettings />
+                    </div>
+                  )}
+                  <LegacyMigrationModal
+                    isOpen={migrationOpen}
+                    onClose={() => setMigrationOpen(false)}
+                    onMigrated={() => { void checkMigration(); }}
+                  />
+                </div>
               )}
             </div>
           )}

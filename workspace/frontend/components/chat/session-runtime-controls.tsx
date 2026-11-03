@@ -47,6 +47,26 @@ interface Runtime {
   queued: number;
 }
 export const runtimeDraftKey = (id: string) => `52hz_runtime_${id}`;
+
+export const updateDraftRuntime = (id: string, patch: Record<string, unknown>) => {
+  let prev: Record<string, unknown> = {};
+  try {
+    prev = JSON.parse(localStorage.getItem(runtimeDraftKey(id)) || '{}') || {};
+  } catch {}
+  const next: Record<string, unknown> = { ...prev, ...patch };
+  if (next.inheritAgent === true) {
+    // Retain agentId, mode, autoCompact, inheritAgent; strip mutually exclusive model override fields
+    delete next.provider;
+    delete next.model;
+    delete next.thinking;
+    delete next.maxTokens;
+    delete next.temperature;
+    delete next.topP;
+    delete next.baseUrl;
+  }
+  localStorage.setItem(runtimeDraftKey(id), JSON.stringify(next));
+  return next;
+};
 const modes = ["chat", "plan", "agent"] as const;
 const modeLabels = { chat: "对话", plan: "只读分析", agent: "实施" };
 
@@ -90,13 +110,19 @@ export function SessionRuntimeControls({
         `/v1/runtime/session?channel=${encodeURIComponent(sessionId)}`,
         { signal: controller.signal },
       )
-      .then((next) => {
+      .then(async (next) => {
         if (!next?.config || !Array.isArray(next.providers)) return;
         if (isDraftSessionId(sessionId)) {
           try {
             const saved = JSON.parse(
               localStorage.getItem(runtimeDraftKey(sessionId)) || "null",
             );
+            if (saved?.agentId && typeof saved.agentId === "string") {
+              try {
+                const ag = await workspaceApi.getAgentDefinition(saved.agentId);
+                if (ag) next.agent = ag;
+              } catch {}
+            }
             if (saved?.inheritAgent === true) {
               next.config = {
                 ...next.config,
@@ -161,6 +187,7 @@ export function SessionRuntimeControls({
   const agentName = runtime.agent?.name || "52hz Agent";
   const maxMode = runtime.agent?.maxMode || "agent";
   const hasCustomOverride = runtime.configSource === "session";
+  const nativeClient = runtime.agent && runtime.agent.runtimeKind !== 'pi';
 
   const applyModeChange = async (targetMode: "chat" | "plan" | "agent") => {
     if (!sessionId || busy) return;
@@ -178,7 +205,7 @@ export function SessionRuntimeControls({
     setSaving(true);
     try {
       if (isDraftSessionId(sessionId)) {
-        localStorage.setItem(runtimeDraftKey(sessionId), JSON.stringify(payload));
+        updateDraftRuntime(sessionId, payload);
         setRuntime({
           ...runtime,
           config: { ...runtime.config, mode: targetMode },
@@ -218,19 +245,31 @@ export function SessionRuntimeControls({
     setSaving(true);
     try {
       if (isDraftSessionId(sessionId)) {
+        const nextMode = agent.defaultMode || "chat";
+        const nextProvider = agent.runtimeKind !== 'pi' ? `native:${agent.runtimeKind}` : agent.modelResource?.connectionId || runtime.config.provider;
+        const nextModel = agent.runtimeKind !== 'pi' ? 'client-default' : agent.modelResource?.modelId || runtime.config.model;
         setRuntime({
           ...runtime,
           agent,
           configSource: "agent",
           config: {
             ...runtime.config,
-            mode: agent.defaultMode || "chat",
+            mode: nextMode,
+            provider: nextProvider,
+            model: nextModel,
           },
         });
-        localStorage.setItem(
-          runtimeDraftKey(sessionId),
-          JSON.stringify({ inheritAgent: true, mode: agent.defaultMode || "chat" }),
-        );
+        setForm({
+          ...form,
+          mode: nextMode,
+          provider: nextProvider,
+          model: nextModel,
+        });
+        updateDraftRuntime(sessionId, {
+          agentId: agent.id,
+          inheritAgent: true,
+          mode: nextMode,
+        });
         toast.success(`执行主体已切换为：${agent.name}`);
       } else {
         const res = await workspaceApi.assignSessionAgent(sessionId, agent.id, false);
@@ -258,9 +297,24 @@ export function SessionRuntimeControls({
     setSaving(true);
     try {
       if (isDraftSessionId(sessionId)) {
+        const defaultProvider = runtime.agent?.modelResource?.connectionId || runtime.config.provider;
+        const defaultModel = runtime.agent?.modelResource?.modelId || runtime.config.model;
         const payload = { inheritAgent: true, mode: form.mode };
-        localStorage.setItem(runtimeDraftKey(sessionId), JSON.stringify(payload));
-        setRuntime({ ...runtime, configSource: "agent" });
+        updateDraftRuntime(sessionId, payload);
+        setRuntime({
+          ...runtime,
+          configSource: "agent",
+          config: {
+            ...runtime.config,
+            provider: defaultProvider,
+            model: defaultModel,
+          },
+        });
+        setForm({
+          ...form,
+          provider: defaultProvider,
+          model: defaultModel,
+        });
       } else {
         const saved = await workspaceApi.request<Runtime>(
           `/v1/runtime/session?channel=${encodeURIComponent(sessionId)}`,
@@ -465,7 +519,7 @@ export function SessionRuntimeControls({
 
               <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface2/60 p-1" role="group">
                 {modes.map((mode) => {
-                  const restricted = modes.indexOf(mode) > modes.indexOf(maxMode);
+                  const restricted = modes.indexOf(mode) > modes.indexOf(maxMode) || Boolean(nativeClient && mode === 'chat');
                   const active = form.mode === mode;
                   return (
                     <button
@@ -473,7 +527,7 @@ export function SessionRuntimeControls({
                       type="button"
                       disabled={busy || restricted}
                       aria-pressed={active}
-                      title={restricted ? "超出此 Agent 允许的最高模式" : undefined}
+                      title={restricted ? nativeClient && mode === 'chat' ? "此客户端暂不支持无工具对话" : "超出此 Agent 允许的最高模式" : undefined}
                       onClick={() => void applyModeChange(mode)}
                       className={cn(
                         "rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35",
@@ -497,6 +551,8 @@ export function SessionRuntimeControls({
                   ? runtime.agent?.permissions.readFiles === false
                     ? "仅分析已提供的上下文材料，不读取文件。"
                     : "只读分析并提供方案，不修改任何项目代码。"
+                  : nativeClient
+                  ? "文件修改需审批；终端权限升级暂不支持。"
                   : runtime.agent?.permissions.executeCommands === false
                   ? "可实施修改代码，不执行外部命令。"
                   : "可实施修改代码；终端命令仍受白名单与审批保护。"}
@@ -504,7 +560,7 @@ export function SessionRuntimeControls({
             </div>
 
             {/* Model Resource / Override Section */}
-            <div className="pt-2 border-t border-border/50 space-y-2">
+            {nativeClient ? <p className="text-2xs text-foreground-muted border-t border-border/50 pt-2">{runtime.agent?.runtimeKind === 'codex' ? 'Codex' : runtime.agent?.runtimeKind} 客户端管理登录、执行资源和上下文。工作台硬预算不兼容时会阻止任务。</p> : <div className="pt-2 border-t border-border/50 space-y-2">
               <div className="flex items-center justify-between text-2xs">
                 <span className="text-foreground-extra-muted">底层执行资源</span>
                 {hasCustomOverride ? (
@@ -545,7 +601,7 @@ export function SessionRuntimeControls({
                   </span>
                 </div>
               )}
-            </div>
+            </div>}
           </>
         )}
       </PopoverContent>

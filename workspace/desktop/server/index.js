@@ -53,7 +53,8 @@ function parseBody(req, maxBytes = 10 * 1024 * 1024) {
   });
 }
 
-function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOptions = {} }) {
+function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topEnv, runtimeOptions = {} }) {
+  if (topEnv && !runtimeOptions.env) runtimeOptions = { ...runtimeOptions, env: topEnv };
   const store = new Store(userDataPath);
   const sseClients = new Set();
   const credentialVault = new CredentialVault(userDataPath, runtimeOptions?.safeStorage, runtimeOptions?.credentialsCache);
@@ -85,6 +86,17 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
 
   const mcpManager = new McpManager({ storage: store.storage });
   const agentRunner = new AgentRunner(store, broadcaster, { ...runtimeOptions, configManager, mcpManager });
+  const { HumanInteractions } = require('./agents/human-interactions');
+  agentRunner.interactions = new HumanInteractions(store.storage, event => broadcaster.broadcast(event));
+  const { NativeConfigService } = require('./agents/config/service');
+  const nativeConfigService = new NativeConfigService({
+    storage: store.storage,
+    userDataPath,
+    runner: agentRunner,
+    env: runtimeOptions?.env || process.env,
+    safeStorage: runtimeOptions?.safeStorage,
+  });
+  agentRunner.nativeConfigService = nativeConfigService;
   const collaboration = new Collaboration(store, agentRunner, broadcaster);
   agentRunner.collaboration = collaboration;
   const worktrees = new Worktrees(store,agentRunner,broadcaster);
@@ -127,6 +139,15 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
       if (!providedToken || providedToken !== expectedToken) {
         return sendJson(res, 401, { error: 'Unauthorized: valid X-Workspace-Token or Bearer token is required.' });
       }
+    }
+
+    // Reads remain available for diagnosis; only system-restore retries may mutate
+    // state while recovery is incomplete or credentials are being reloaded.
+    if (pathname.startsWith('/v1/') && !['GET', 'HEAD'].includes(req.method)
+        && !['/v1/migration/rollback', '/v1/backups/restore'].includes(pathname)
+        && agentRunner.isRecoveryBlocked()) {
+      return sendJson(res, 409, { error: agentRunner.recoveryFailure?.message || 'System recovery is in progress.',
+        code: agentRunner.recoveryFailure?.code || 'RECOVERY_IN_PROGRESS' });
     }
 
     // 1. SSE Stream Route
@@ -178,7 +199,85 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
     // 2. REST API Routes (/v1/...)
     if (pathname.startsWith('/v1/')) {
       try {
+        if (pathname === '/v1/interactions' && req.method === 'GET') {
+          if (typeof query.channel !== 'string' || !query.channel) return sendJson(res, 400, { error: 'channel is required' });
+          return sendJson(res, 200, { interactions: store.storage.humanInteractions.list({ channel: query.channel }) });
+        }
+        const taskInteractions = pathname.match(/^\/v1\/tasks\/([^/]+)\/interactions$/);
+        if (taskInteractions && req.method === 'GET') return sendJson(res, 200,
+          { interactions: store.storage.humanInteractions.list({ runId: decodeURIComponent(taskInteractions[1]) }) });
+        const interactionAction = pathname.match(/^\/v1\/interactions\/([^/]+)\/(answer|decision|cancel)$/);
+        if (interactionAction && req.method === 'POST') {
+          const body = await parseBody(req, 256 * 1024);
+          agentRunner.assertRecoveryReady();
+          return sendJson(res, 200, { interaction: agentRunner.interactions.answer(decodeURIComponent(interactionAction[1]), body, interactionAction[2]) });
+        }
         // Local Agent identities are independent of model connections and work profiles.
+        if (pathname === '/v1/agent-runtimes' && req.method === 'GET') {
+          const budget = store.storage?.budgets.get();
+          const hardBudget = Boolean(budget && (budget.maxTokensPerRun || budget.maxStepsPerRun || budget.maxCostPerSession || budget.maxCostPerDay));
+          return sendJson(res, 200, { runtimes: require('./native-runtimes').listRuntimes().map(runtime => ({ ...runtime,
+            ...(runtime.kind === 'codex' && hardBudget ? { budgetBlocked: true, reason: runtime.reason + ' 当前工作台硬预算与原生请求不兼容，任务会被拦截。' } : {}),
+          })) });
+        }
+        if (pathname === '/v1/agent-connections/candidates' && req.method === 'GET') {
+          const result = await nativeConfigService.discoverCandidates({ versions: query.versions === 'true' });
+          return sendJson(res, 200, result);
+        }
+        if (pathname === '/v1/agent-connections' && req.method === 'GET') {
+          const repo = store.storage?.agentConnections;
+          if (!repo) return sendJson(res, 503, { error: 'Agent connections storage unavailable.' });
+          return sendJson(res, 200, { connections: repo.list({ includeDisabled: query.includeDisabled === 'true' }) });
+        }
+        if (pathname === '/v1/agent-connections' && req.method === 'POST') {
+          const body = await parseBody(req);
+          const created = nativeConfigService.registerConnection(body);
+          return sendJson(res, 201, created);
+        }
+        const connSubMatch = pathname.match(/^\/v1\/agent-connections\/([^/]+)(?:\/(capabilities|config|resources|config\/preview|config\/apply|config\/rollback))?$/);
+        if (connSubMatch) {
+          const repo = store.storage?.agentConnections;
+          if (!repo) return sendJson(res, 503, { error: 'Agent connections storage unavailable.' });
+          const connId = decodeURIComponent(connSubMatch[1]);
+          const subRoute = connSubMatch[2] || null;
+          if (!subRoute) {
+            if (req.method === 'GET') {
+              const conn = repo.get(connId);
+              return sendJson(res, conn ? 200 : 404, conn || { error: 'Connection not found.' });
+            }
+            if (req.method === 'DELETE') {
+              const body = await parseBody(req);
+              repo.delete(connId, body.expectedRevision);
+              return sendJson(res, 200, { deleted: true });
+            }
+            return sendJson(res, 405, { error: 'Method not allowed.' });
+          }
+          if (subRoute === 'capabilities' && req.method === 'GET') {
+            const conn = repo.requireRegistered(connId);
+            const { getConnectionCapabilitySnapshot } = require('./agents/registry');
+            const liveSnapshot = await getConnectionCapabilitySnapshot(conn, { env: runtimeOptions?.env || process.env });
+            return sendJson(res, 200, { connectionId: conn.id, kind: conn.kind || conn.adapterKind, capabilitySnapshot: liveSnapshot });
+          }
+          if (subRoute === 'config' && req.method === 'GET') {
+            return sendJson(res, 200, nativeConfigService.inspectConfig(connId, { projectDir: query.projectDir || null }));
+          }
+          if (subRoute === 'resources' && req.method === 'GET') {
+            return sendJson(res, 200, nativeConfigService.listResources(connId));
+          }
+          if (subRoute === 'config/preview' && req.method === 'POST') {
+            const body = await parseBody(req);
+            return sendJson(res, 200, nativeConfigService.prepareConfigChange(connId, body));
+          }
+          if (subRoute === 'config/apply' && req.method === 'POST') {
+            const body = await parseBody(req);
+            return sendJson(res, 200, await nativeConfigService.applyConfigChange(connId, body));
+          }
+          if (subRoute === 'config/rollback' && req.method === 'POST') {
+            const body = await parseBody(req);
+            return sendJson(res, 200, await nativeConfigService.rollbackConfigChange(connId, body));
+          }
+          return sendJson(res, 405, { error: 'Method not allowed.' });
+        }
         const agentDefinitionMatch = pathname.match(/^\/v1\/agent-definitions(?:\/([^/]+))?$/);
         if (agentDefinitionMatch) {
           const repository = store.storage?.agentDefinitions;
@@ -235,7 +334,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         }
         if (pathname === '/v1/runtime/recovery' && req.method === 'GET') {
           const runs=store.data.runtime_runs.filter(row=>row.channel===query.channel).slice(-20);
-          return sendJson(res,200,{storage:store.recovery || null,runs:await Promise.all(runs.map(async row=>({...row,checkpoint:await agentRunner.recoveryCheckpoint(query.channel,row)})))});
+          return sendJson(res,200,{storage:store.recovery || null,systemRecovery:agentRunner.recoveryFailure,runs:await Promise.all(runs.map(async row=>({...row,checkpoint:await agentRunner.recoveryCheckpoint(query.channel,row)})))});
         }
         if (pathname === '/v1/runtime/restore' && req.method === 'POST') {
           const body=await parseBody(req);
@@ -256,7 +355,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           if (req.method === 'PATCH') {
             if (!store.getChannel(channel)) return sendJson(res, 404, { error: 'Session not found.' });
             if (agentRunner.active.has(channel) || agentRunner.workspaceOperations.has(channel)) return sendJson(res, 409, { error: 'Stop the current response before changing its model or mode.' });
-            const config = agentRunner.validateSessionConfig(await parseBody(req));
+            const config = agentRunner.validateSessionConfig(await parseBody(req), agentRunner.identity(channel));
             store.updateChannel(channel, { runtime_config: config });
           } else if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed.' });
           const lastRun=store.data.runtime_runs.filter(row=>row.channel===channel).at(-1);
@@ -341,6 +440,337 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
             storage: store.storage,
             userDataPath: store.userDataPath || store.dir,
           }));
+        }
+
+        // Legacy Migration & Compatibility Endpoints (R4)
+        if (pathname === '/v1/migration/legacy-check' && req.method === 'GET') {
+          if (!store.storage) return sendJson(res, 200, { needsMigration: false, stats: { totalIssues: 0, workProfiles: 0, savedWorkflows: 0, sessions: 0 }, issues: [], availableAgents: [], lastMigration: null });
+          const agents = store.storage.agentDefinitions.list({ includeDisabled: true });
+          const validAgentIds = new Set(agents.map(a => a.id));
+          const issues = [];
+          let wpCount = 0, wfCount = 0, sessCount = 0;
+
+          // 1. Check work profiles
+          try {
+            const profiles = store.storage.orchestration.listProfiles();
+            for (const profile of profiles) {
+              if (!validAgentIds.has(profile.agent)) {
+                wpCount++;
+                issues.push({
+                  id: profile.id,
+                  targetType: 'work_profile',
+                  name: profile.name,
+                  field: 'agent',
+                  currentValue: profile.agent,
+                  reason: `协作工作配置引用了未定义的旧角色或 Agent ID: "${profile.agent}"`,
+                  suggestedRole: profile.role || 'implementer',
+                  details: { mode: profile.mode, description: profile.description },
+                });
+              }
+            }
+          } catch (_) {}
+
+          // 2. Check saved workflows
+          try {
+            const workflows = store.storage.pipelines.listSavedWorkflows('52hz');
+            for (const wf of workflows) {
+              const steps = wf.steps || [];
+              steps.forEach((step, idx) => {
+                const target = step.agent || step.agent_id;
+                if (target && !validAgentIds.has(target)) {
+                  wfCount++;
+                  issues.push({
+                    id: wf.id,
+                    targetType: 'saved_workflow',
+                    name: `${wf.name} (步骤 #${idx + 1}: ${step.title || step.task || '未命名'})`,
+                    field: `steps[${idx}].agent`,
+                    currentValue: target,
+                    reason: `流水线步骤引用了未定义的旧角色或 Agent ID: "${target}"`,
+                    suggestedRole: step.role || 'assistant',
+                    details: { stepIndex: idx, stepTitle: step.title || step.task || '', workflowName: wf.name },
+                  });
+                }
+              });
+            }
+          } catch (_) {}
+
+          // 3. Check legacy sessions
+          try {
+            const legacySessions = store.storage.db.prepare(
+              "SELECT id, title, agent_id FROM sessions WHERE agent_id IS NULL OR agent_id NOT IN (SELECT id FROM agent_definitions)"
+            ).all();
+            for (const sess of legacySessions) {
+              sessCount++;
+              issues.push({
+                id: sess.id,
+                targetType: 'session',
+                name: sess.title || sess.id,
+                field: 'agent_id',
+                currentValue: sess.agent_id || '(未绑定)',
+                reason: '会话未绑定合法的 Agent 身份',
+                suggestedRole: 'assistant',
+                details: {},
+              });
+            }
+          } catch (_) {}
+
+          const lastMigration = store.storage.settings.get('legacy_agent_migration_last');
+          return sendJson(res, 200, {
+            needsMigration: issues.length > 0,
+            stats: { totalIssues: issues.length, workProfiles: wpCount, savedWorkflows: wfCount, sessions: sessCount },
+            issues,
+            availableAgents: agents.filter(a => a.status === 'active').map(a => ({ id: a.id, name: a.name, role: a.role })),
+            lastMigration: lastMigration || null,
+          });
+        }
+
+        if (pathname === '/v1/migration/execute' && req.method === 'POST') {
+          if (!store.storage) return sendJson(res, 503, { error: 'Storage unavailable' });
+          if (agentRunner.isRecoveryBlocked()) return sendJson(res, 409, { error: 'System recovery is in progress; migration cannot be started.' });
+          const body = await parseBody(req);
+          const resolutions = Array.isArray(body.resolutions) ? body.resolutions : [];
+          if (resolutions.length === 0) return sendJson(res, 400, { error: 'No resolutions provided.' });
+
+          // 1. Hot pre-migration backup
+          let backupResult = { backupPath: ':memory:', checksum: 'memory' };
+          if (store.storage.manager.dbPath !== ':memory:') {
+            try {
+              backupResult = await store.storage.backupManager.createBackup({ label: 'pre-agent-migration' });
+            } catch (err) {
+              return sendJson(res, 500, { error: `Failed to create pre-migration backup: ${err.message}` });
+            }
+          }
+
+          // 2. Atomic transaction with strict validation and conservative permissions
+          try {
+            const createdAgents = [];
+            let actualMigratedCount = 0;
+
+            store.storage.transaction(db => {
+              for (const resItem of resolutions) {
+                if (!resItem || !resItem.targetType || !resItem.id || !resItem.action) {
+                  throw Object.assign(new Error('Invalid resolution item format.'), { status: 400 });
+                }
+
+                // Verify target entity exists in DB before applying resolution
+                if (resItem.targetType === 'work_profile') {
+                  const existingWp = db.prepare('SELECT id, agent FROM work_profiles WHERE id = ?').get(resItem.id);
+                  if (!existingWp) {
+                    throw Object.assign(new Error(`Work profile "${resItem.id}" not found.`), { status: 404 });
+                  }
+                } else if (resItem.targetType === 'saved_workflow') {
+                  const existingWf = db.prepare('SELECT id, steps_json FROM saved_workflows WHERE id = ?').get(resItem.id);
+                  if (!existingWf) {
+                    throw Object.assign(new Error(`Saved workflow "${resItem.id}" not found.`), { status: 404 });
+                  }
+                  if (resItem.action !== 'deprecate') {
+                    const steps = JSON.parse(existingWf.steps_json || '[]');
+                    const idx = resItem.details?.stepIndex ?? resItem.stepIndex ?? 0;
+                    if (!steps[idx]) {
+                      throw Object.assign(new Error(`Workflow step index ${idx} not found in workflow "${resItem.id}".`), { status: 400 });
+                    }
+                  }
+                } else if (resItem.targetType === 'session') {
+                  const existingSess = db.prepare('SELECT id FROM sessions WHERE id = ?').get(resItem.id);
+                  if (!existingSess) {
+                    throw Object.assign(new Error(`Session "${resItem.id}" not found.`), { status: 404 });
+                  }
+                } else {
+                  throw Object.assign(new Error(`Unknown targetType: "${resItem.targetType}".`), { status: 400 });
+                }
+
+                // Handle deprecate/archive action
+                if (resItem.action === 'deprecate') {
+                  if (resItem.targetType === 'work_profile') {
+                    const res = db.prepare('DELETE FROM work_profiles WHERE id = ?').run(resItem.id);
+                    if (res.changes > 0) actualMigratedCount++;
+                  } else if (resItem.targetType === 'saved_workflow') {
+                    const res = db.prepare('DELETE FROM saved_workflows WHERE id = ?').run(resItem.id);
+                    if (res.changes > 0) actualMigratedCount++;
+                  } else if (resItem.targetType === 'session') {
+                    const res = db.prepare("UPDATE sessions SET status = 'archived', updated_at = ? WHERE id = ?").run(new Date().toISOString(), resItem.id);
+                    if (res.changes > 0) actualMigratedCount++;
+                  }
+                  continue;
+                }
+
+                let resolvedAgentId = resItem.targetAgentId;
+
+                // Handle bind_agent action: strictly validate target agent existence and active status
+                if (resItem.action === 'bind_agent') {
+                  if (!resolvedAgentId || typeof resolvedAgentId !== 'string') {
+                    throw Object.assign(new Error(`Missing targetAgentId for ${resItem.targetType} "${resItem.id}".`), { status: 400 });
+                  }
+                  const agentRow = db.prepare('SELECT id, status FROM agent_definitions WHERE id = ?').get(resolvedAgentId);
+                  if (!agentRow) {
+                    throw Object.assign(new Error(`Target Agent "${resolvedAgentId}" does not exist.`), { status: 400 });
+                  }
+                  if (agentRow.status !== 'active') {
+                    throw Object.assign(new Error(`Target Agent "${resolvedAgentId}" is disabled. Choose an active Agent.`), { status: 400 });
+                  }
+                } else if (resItem.action === 'create_agent') {
+                  if (!resItem.newAgent || !resItem.newAgent.name?.trim()) {
+                    throw Object.assign(new Error(`Missing newAgent configuration for ${resItem.targetType} "${resItem.id}".`), { status: 400 });
+                  }
+                  // True idempotency: use provenance migration tag instead of ambiguous name matching
+                  const provKey = `agent_migrated_prov_${resItem.targetType}_${resItem.id}_${resItem.details?.stepIndex ?? 0}`;
+                  const existingTaggedId = store.storage.settings.get(provKey);
+                  let existingAgent = null;
+                  if (existingTaggedId && typeof existingTaggedId === 'string') {
+                    existingAgent = db.prepare('SELECT id, status FROM agent_definitions WHERE id = ?').get(existingTaggedId);
+                  }
+
+                  if (existingAgent) {
+                    resolvedAgentId = existingAgent.id;
+                  } else {
+                    const newAgentId = `agent-${crypto.randomUUID()}`;
+                    const now = new Date().toISOString();
+                    // Conservative permissions according to plan: readFiles=true, writeFiles=false, executeCommands=false
+                    const policy = {
+                      instructions: resItem.newAgent.instructions || '',
+                      defaultMode: 'chat',
+                      maxMode: 'agent',
+                      modelResource: null,
+                      permissions: { readFiles: true, writeFiles: false, executeCommands: false, delegate: false, knowledge: true, mcp: false },
+                      limits: {},
+                    };
+                    db.prepare(`INSERT INTO agent_definitions (id, name, description, role, status, created_at, updated_at, execution_policy_json)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+                      newAgentId,
+                      resItem.newAgent.name.trim(),
+                      resItem.newAgent.description?.trim() || '由历史配置安全迁移创建',
+                      resItem.newAgent.role?.trim() || 'assistant',
+                      'active',
+                      now,
+                      now,
+                      JSON.stringify(policy)
+                    );
+                    resolvedAgentId = newAgentId;
+                    store.storage.settings.set(provKey, newAgentId);
+                    createdAgents.push({ id: newAgentId, name: resItem.newAgent.name.trim() });
+                  }
+                } else {
+                  throw Object.assign(new Error(`Unsupported resolution action "${resItem.action}".`), { status: 400 });
+                }
+
+                // Apply binding
+                if (resItem.targetType === 'work_profile') {
+                  const res = db.prepare('UPDATE work_profiles SET agent = ?, updated_at = ? WHERE id = ?').run(resolvedAgentId, new Date().toISOString(), resItem.id);
+                  if (res.changes > 0) actualMigratedCount++;
+                } else if (resItem.targetType === 'saved_workflow') {
+                  const wfRow = db.prepare('SELECT steps_json FROM saved_workflows WHERE id = ?').get(resItem.id);
+                  if (wfRow && wfRow.steps_json) {
+                    const steps = JSON.parse(wfRow.steps_json);
+                    const idx = resItem.details?.stepIndex ?? resItem.stepIndex ?? 0;
+                    if (steps[idx]) {
+                      steps[idx].agent = resolvedAgentId;
+                      steps[idx].agent_id = resolvedAgentId;
+                      const res = db.prepare('UPDATE saved_workflows SET steps_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(steps), new Date().toISOString(), resItem.id);
+                      if (res.changes > 0) actualMigratedCount++;
+                    }
+                  }
+                } else if (resItem.targetType === 'session') {
+                  const res = db.prepare('UPDATE sessions SET agent_id = ? WHERE id = ?').run(resolvedAgentId, resItem.id);
+                  if (res.changes > 0) actualMigratedCount++;
+                }
+              }
+
+              // Record audit
+              const audit = {
+                timestamp: new Date().toISOString(),
+                backupPath: backupResult.backupPath,
+                backupChecksum: backupResult.checksum,
+                migratedCount: actualMigratedCount,
+                createdAgents,
+                actions: resolutions.map(r => ({ targetType: r.targetType, id: r.id, action: r.action })),
+              };
+              store.storage.settings.set('legacy_agent_migration_last', audit);
+              store.storage.settings.set(`agent_migration_audit_${Date.now()}`, audit);
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              backup: backupResult,
+              migratedCount: actualMigratedCount,
+              createdAgents,
+              timestamp: new Date().toISOString(),
+            });
+          } catch (txErr) {
+            const status = txErr.status || 500;
+            return sendJson(res, status, { error: `Migration failed: ${txErr.message}`, backup: backupResult });
+          }
+        }
+
+        async function executeSystemRestore(backupPath, { clearMigrationAudit = false } = {}) {
+          if (!backupPath || typeof backupPath !== 'string') {
+            throw Object.assign(new Error('backupPath required'), { status: 400 });
+          }
+          if (!store.storage?.backupManager) {
+            throw Object.assign(new Error('Storage or backup manager unavailable'), { status: 503 });
+          }
+
+          // Synchronously acquire recovery lock & check active runs/queues/operations/restoring without race window
+          if (!agentRunner.acquireRecoveryLock()) {
+            throw Object.assign(new Error('Cannot rollback while tasks, queues, recovery, or workspace operations are active. Stop all sessions first.'), { status: 409 });
+          }
+
+          let physicalRestored = false;
+          try {
+            const restored = store.storage.backupManager.restoreFromBackup(backupPath);
+            physicalRestored = true;
+            credentialVault.invalidate();
+            if (clearMigrationAudit) {
+              store.storage.settings.set('legacy_agent_migration_last', null);
+            }
+
+            // Refresh in-memory store and config
+            if (typeof store.reload === 'function') {
+              store.reload();
+            } else {
+              store.data = store.load();
+              store.committed = JSON.stringify(store.data);
+            }
+            if (configManager) {
+              if (typeof configManager.reload === 'function') {
+                await configManager.reload();
+              } else if (typeof configManager.loadUserConnections === 'function') {
+                configManager.userConnections = configManager.loadUserConnections();
+              }
+            }
+            // ConfigManager.reload already refreshes this vault. Do not make a
+            // second IPC request after a successful credential refresh.
+            if (typeof configManager?.reload !== 'function' && typeof credentialVault?.reload === 'function') {
+              await credentialVault.reload();
+            }
+            agentRunner.interactions?.recover({ force: true });
+            agentRunner.completeRecovery();
+            if (typeof broadcaster?.broadcast === 'function') {
+              broadcaster.broadcast({ type: 'workspace.updated', source: 'system', target: 'all', payload: store.data.workspace });
+            }
+            return restored;
+          } catch (error) {
+            if (physicalRestored) {
+              credentialVault.invalidate();
+              agentRunner.failRecovery();
+              broadcaster.broadcast({ type: 'workspace.recovery.failed', source: 'system', target: 'all', payload: agentRunner.recoveryFailure });
+              throw Object.assign(new Error(agentRunner.recoveryFailure.message), { status: 500, code: 'RECOVERY_INCOMPLETE' });
+            }
+            throw error;
+          } finally {
+            agentRunner.releaseRecoveryLock();
+          }
+        }
+
+        if (pathname === '/v1/migration/rollback' && req.method === 'POST') {
+          if (!store.storage) return sendJson(res, 503, { error: 'Storage unavailable' });
+          const body = await parseBody(req);
+          const backupPath = body.backupPath || body.path;
+          try {
+            const restored = await executeSystemRestore(backupPath, { clearMigrationAudit: true });
+            return sendJson(res, 200, { success: true, restoredFrom: backupPath, restored });
+          } catch (restoreErr) {
+            return sendJson(res, restoreErr.status || 500, { error: restoreErr.message, ...(restoreErr.code ? { code: restoreErr.code } : {}) });
+          }
         }
         // Workspace endpoints
         // Empty read models are explicit; unsupported mutations still fail below.
@@ -598,13 +1028,11 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           if (!store.storage?.backupManager) return sendJson(res, 501, { error: 'Backup manager unavailable' });
           const body = await parseBody(req);
           const backupPath = body?.path || body?.backupPath || body?.backup_path;
-          if (!backupPath) return sendJson(res, 400, { error: 'backupPath is required' });
           try {
-            const restored = store.storage.backupManager.restoreFromBackup(backupPath);
-            store.data = store.load();
+            const restored = await executeSystemRestore(backupPath);
             return sendJson(res, 200, { success: true, restored });
-          } catch (err) {
-            return sendJson(res, 500, { error: err.message });
+          } catch (restoreErr) {
+            return sendJson(res, restoreErr.status || 500, { error: restoreErr.message, ...(restoreErr.code ? { code: restoreErr.code } : {}) });
           }
         }
 
@@ -631,6 +1059,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           });
         }
         if (pathname === '/v1/parallel-batch/start' && req.method === 'POST') {
+          if (agentRunner.isRecoveryBlocked()) return sendJson(res, 409, { error: 'System recovery is in progress; parallel batches cannot be started.' });
           const body = await parseBody(req);
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
           const channel = body.channel_name || body.channel || 'general';
@@ -724,6 +1153,49 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           }
         }
 
+        // Saved Workflows API
+        const workflowsMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/workflows(?:\/([^/]+))?(\/run)?$/);
+        if (workflowsMatch) {
+          const [, ws, rawWfId, isRun] = workflowsMatch;
+          const wfId = rawWfId ? decodeURIComponent(rawWfId) : null;
+          if (isRun && req.method === 'POST') {
+            if (agentRunner.isRecoveryBlocked()) return sendJson(res, 409, { error: 'System recovery is in progress; workflows cannot be started.' });
+            const body = await parseBody(req);
+            if (!store.storage?.pipelines) return sendJson(res, 501, { error: 'Pipeline storage unavailable' });
+            const wf = store.storage.pipelines.getSavedWorkflow(ws, wfId);
+            if (!wf) return sendJson(res, 404, { error: 'Workflow not found' });
+            const channel = body.channel || 'general';
+            if (!Array.isArray(wf.steps) || wf.steps.length === 0) {
+              return sendJson(res, 400, { error: 'Workflow has no steps.' });
+            }
+            const steps = wf.steps.map((step, idx) => ({
+              agent_id: step.agent_id || step.agent,
+              instruction: step.instruction || step.task || step.title || `Execute workflow step ${idx + 1}`,
+              title: step.title || `Step ${idx + 1}`,
+            }));
+            const runningPipeline = collaboration.startPipeline(channel, {
+              steps,
+              started_by: body.source || `workflow:${wf.name}`,
+            });
+            return sendJson(res, 200, { ok: true, pipeline: runningPipeline, workflow: wf.name });
+          }
+          if (req.method === 'GET' && !wfId) {
+            if (!store.storage?.pipelines) return sendJson(res, 200, { workflows: [] });
+            return sendJson(res, 200, { workflows: store.storage.pipelines.listSavedWorkflows(ws) });
+          }
+          if (req.method === 'POST' && !wfId) {
+            const body = await parseBody(req);
+            if (!store.storage?.pipelines) return sendJson(res, 501, { error: 'Storage unavailable' });
+            const saved = store.storage.pipelines.saveWorkflow(ws, body);
+            return sendJson(res, 200, saved);
+          }
+          if (req.method === 'DELETE' && wfId) {
+            if (!store.storage?.pipelines) return sendJson(res, 501, { error: 'Storage unavailable' });
+            store.storage.pipelines.deleteSavedWorkflow(ws, wfId);
+            return sendJson(res, 200, { ok: true });
+          }
+        }
+
         if (/^\/v1\/workspaces\/[^/]+\/session-usage$/.test(pathname)) {
           return sendJson(res, 200, sessionUsage(store.data.events, query.channel || 'general'));
         }
@@ -763,7 +1235,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
             if (body.working_dir !== undefined && [...agentRunner.active.values()].some(run => run.snapshot.channel === chName)) return sendJson(res, 409, { error: 'Stop the run before changing its project folder.' });
             if (body.runtime_config !== undefined) {
               if ([...agentRunner.active.values()].some(run => run.snapshot.channel === chName)) return sendJson(res, 409, { error: 'Stop the current response before changing its model or mode.' });
-              body.runtime_config = agentRunner.validateSessionConfig(body.runtime_config);
+              body.runtime_config = agentRunner.validateSessionConfig(body.runtime_config, agentRunner.identity(chName));
             }
             const updated = store.updateChannel(chName, body);
             return sendJson(res, 200, updated);
@@ -799,7 +1271,8 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
               const existing = body.client_message_id && store.data.events.find(e => e.client_message_id === body.client_message_id);
               if (existing) return sendJson(res, 200, { event_id: existing.event_id, timestamp: existing.timestamp, status: 'confirmed', metadata: existing.metadata, duplicate: true });
               const name = `session-${crypto.randomUUID()}`;
-              const runtimeConfig = body.payload?.runtime_config ? agentRunner.validateSessionConfig(body.payload.runtime_config) : { inheritAgent: true };
+              const selectedAgent = store.storage.agentDefinitions.requireActive(body.payload?.agent_id || 'agent-local');
+              const runtimeConfig = body.payload?.runtime_config ? agentRunner.validateSessionConfig(body.payload.runtime_config, selectedAgent) : { inheritAgent: true };
               store.updateChannel(name, { title: body.payload?.title || 'New Session', runtime_config: runtimeConfig,
                 agent_id: body.payload?.agent_id || 'agent-local',
                 participants: body.payload?.participants || [], master: body.payload?.master || null,
@@ -811,9 +1284,12 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
             const messageSource = body.source || 'human:user';
             const messageTarget = body.target || 'channel/general';
             if (!previouslyDelivered && messageType === 'workspace.message.posted' && messageSource.startsWith('human:') && messageTarget.startsWith('channel/')) {
+              if (agentRunner.isRecoveryBlocked()) {
+                return sendJson(res, 409, { error: 'System recovery is in progress. Please retry after recovery completes.' });
+              }
               const channel = messageTarget.slice('channel/'.length);
               agentRunner.identity(channel, { requireActive: true });
-              agentRunner.validateConfig(agentRunner.config(channel));
+              agentRunner.validateConfig(agentRunner.config(channel), agentRunner.identity(channel));
             }
             const saved = store.addEvent(body);
             if (!saved.duplicate) broadcaster.broadcast(saved);
@@ -1063,7 +1539,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         return sendJson(res, 404, { error: 'This feature is not available in the desktop runtime yet.' });
       } catch (err) {
         console.error('[API Router Error]', err);
-        return sendJson(res, err.status || 500, { error: err.message });
+        return sendJson(res, err.status || 500, { error: err.message, ...(err.code ? { code: err.code } : {}) });
       }
     }
 
@@ -1074,6 +1550,9 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
   server.scheduler = scheduler;
   server.store = store;
   server.agentRunner = agentRunner;
+  server.configManager = configManager;
+  server.nativeConfigService = nativeConfigService;
+  server.credentialVault = credentialVault;
   server.on('close', () => {
     scheduler.stop();
     agentRunner.close();
@@ -1092,7 +1571,12 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
     server.closeAllConnections?.();
     await new Promise(resolve => server.close(resolve));
   };
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
+    if (typeof nativeConfigService.init === 'function') {
+      try {
+        await nativeConfigService.init();
+      } catch (_) {}
+    }
     server.listen(port, '127.0.0.1', () => {
       const actualPort = server.address().port;
       console.log(`[52hzAgents Embedded Server] Listening on http://127.0.0.1:${actualPort}`);

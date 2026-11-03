@@ -26,6 +26,9 @@ const { PipelinesRepository } = require('./repositories/pipelines');
 const { OrchestrationRepository } = require('./repositories/orchestration');
 const { BackupManager } = require('./backup');
 const { AgentDefinitionsRepository } = require('./repositories/agent-definitions');
+const { AgentConnectionsRepository } = require('./repositories/agent-connections');
+const { NativeSessionBindingsRepository } = require('./repositories/native-session-bindings');
+const { HumanInteractionsRepository } = require('./repositories/human-interactions');
 
 class Storage {
   /**
@@ -50,6 +53,9 @@ class Storage {
     this.db = this.manager.db;
 
     this.sessions = new SessionsRepository(this.manager);
+    this.agentConnections = new AgentConnectionsRepository(this.manager);
+    this.nativeSessionBindings = new NativeSessionBindingsRepository(this.manager);
+    this.humanInteractions = new HumanInteractionsRepository(this.manager);
     this.agentDefinitions = new AgentDefinitionsRepository(this.manager);
     this.messages = new MessagesRepository(this.manager);
     this.events = new EventsRepository(this.manager);

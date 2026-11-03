@@ -1,12 +1,14 @@
 const crypto = require("crypto");
 const { streamModel } = require("./model-stream");
 const { RuntimeTools } = require('./runtime-tools');
+const { HumanInteractions } = require('./agents/human-interactions');
 const {projectSnapshot,changesSince} = require('./project-evidence');
 const {normalizeUrl} = require('./config-manager');
 const { Checkpoints } = require('./checkpoints');
 const { categorizeError } = require('./connection-tester');
 const { DEFAULT_AGENT_ID } = require('./storage/repositories/agent-definitions');
 const { policyOf, restrictMode, toolAllowed, checkAgentBudget } = require('./agent-policy');
+const { assertNativePolicy, runCodex, runNativeAdapter } = require('./native-runtimes');
 const fs = require('node:fs');
 const path = require('node:path');
 const projectKey = value => {
@@ -52,19 +54,21 @@ class AgentRunner {
   constructor(
     store,
     broadcaster,
-    { env = process.env, stream = null, piRuntime = runPi, timeoutMs = 900_000, configManager = null, mcpManager = null } = {},
+    { env = process.env, stream = null, piRuntime = runPi, nativeRuntime = runNativeAdapter, timeoutMs = 900_000, configManager = null, mcpManager = null } = {},
   ) {
     this.store = store;
     this.broadcaster = broadcaster;
     this.env = env;
     this.stream = stream;
     this.piRuntime = piRuntime;
+    this.nativeRuntime = nativeRuntime;
     this.configManager = configManager;
       this.mcpManager = mcpManager || null;
     this.tools = new RuntimeTools(store, broadcaster);
     this.checkpoints = new Checkpoints(store.userDataPath);
     this.restoring = new Set();
     this.workspaceOperations = new Set();
+    this.recoveryFailure = null;
     this.timeoutMs = timeoutMs;
     this.active = new Map();
     this.queues = new Map();
@@ -104,6 +108,39 @@ class AgentRunner {
           row.execution_key || row.channel_name,
         );
   }
+  isRecoveryLocked() {
+    return Boolean(this.workspaceOperations && this.workspaceOperations.has('__system_recovery__'));
+  }
+  isRecoveryBlocked() {
+    return this.isRecoveryLocked() || Boolean(this.recoveryFailure);
+  }
+  assertRecoveryReady() {
+    if (!this.isRecoveryBlocked()) return;
+    throw Object.assign(new Error(this.recoveryFailure?.message || 'System recovery is in progress.'), {
+      status: 409, code: this.recoveryFailure?.code || 'RECOVERY_IN_PROGRESS',
+    });
+  }
+  failRecovery() {
+    this.recoveryFailure = { code: 'RECOVERY_INCOMPLETE', message: '系统恢复未完成，任务执行已暂停。请重试备份恢复，成功后才能继续执行。' };
+  }
+  completeRecovery() {
+    this.recoveryFailure = null;
+  }
+  acquireRecoveryLock() {
+    if (this.isRecoveryLocked()) return false;
+    const isBusy = (this.active && this.active.size > 0)
+      || (this.queues && this.queues.size > 0)
+      || (this.restoring && this.restoring.size > 0)
+      || (this.workspaceOperations && this.workspaceOperations.size > 0);
+    if (isBusy) return false;
+    this.workspaceOperations.add('__system_recovery__');
+    return true;
+  }
+  releaseRecoveryLock() {
+    if (this.workspaceOperations) {
+      this.workspaceOperations.delete('__system_recovery__');
+    }
+  }
   providers() {
     if (this.configManager) {
       return this.configManager.getConnections().map((c) => ({
@@ -126,9 +163,25 @@ class AgentRunner {
         p.model,
     }));
   }
+  isNativeIdentity(identity) { return Boolean(identity && (identity.connectionId || (identity.runtimeKind && identity.runtimeKind !== 'pi'))); }
+  nativeConfigDefaults(identity) {
+    const tag = identity?.execution?.connectionKind === 'native-pi' ? 'pi' : (identity.runtimeKind || 'native');
+    let nativeEffectiveModel = identity.runtimeModel || null;
+    if (!nativeEffectiveModel && identity.connectionId && this.nativeConfigService) {
+      try {
+        const eff = this.nativeConfigService.inspectConfig(identity.connectionId)?.effective;
+        if (eff?.defaultModel) nativeEffectiveModel = eff.defaultProvider && tag === 'pi' ? `${eff.defaultProvider}/${eff.defaultModel}` : eff.defaultModel;
+      } catch {}
+    }
+    return { provider: `native:${tag}`, model: nativeEffectiveModel || 'client-default', runtimeKind: identity.runtimeKind, ...(identity.connectionId ? { agentConnectionId: identity.connectionId } : {}) };
+  }
   config(channel, identity = this.identity(channel)) {
     const policy = policyOf(identity);
     const saved = this.store.getChannel(channel)?.runtime_config;
+    if (this.isNativeIdentity(identity)) return { ...this.nativeConfigDefaults(identity), mode: restrictMode(saved?.inheritAgent && saved.mode ? saved.mode : policy.defaultMode, policy.maxMode), autoCompact: false,
+
+
+    };
     const provider =
       this.providers().find((p) => p.configured && p.id !== "ollama")?.id ||
       "ollama";
@@ -142,7 +195,10 @@ class AgentRunner {
     effective.mode = restrictMode(effective.mode, policy.maxMode);
     return effective;
   }
-  validateSessionConfig(input) {
+  validateSessionConfig(input, identity) {
+    if (this.isNativeIdentity(identity) && (input?.inheritAgent !== true || input.mode === 'chat')) {
+      throw Object.assign(new Error('原生客户端会话只接受继承 Agent 的只读分析或实施配置。请在 Agent 高级设置中调整执行资源。'), { status: 400 });
+    }
     if (input?.inheritAgent === true) {
       if (Object.keys(input).some(key => !['inheritAgent', 'mode', 'autoCompact'].includes(key)) ||
           (input.mode !== undefined && !['chat', 'plan', 'agent'].includes(input.mode))) {
@@ -158,6 +214,12 @@ class AgentRunner {
     const known = this.configManager ? Boolean(this.configManager.getConnection(id)) : Object.hasOwn(PROVIDERS, id || '');
     if (!known) throw Object.assign(new Error('Choose an existing model connection for this Agent.'), { status: 400 });
   }
+  validateNativeExecution(agent, config, options = {}) {
+    if (!this.isNativeIdentity(agent)) return;
+    for (const budgets of [this.store.storage?.budgets.get(), this.store.storage?.budgets.getForSession(options.channel)]) {
+      assertNativePolicy(agent, config, { ...options, env: this.env, budgets });
+    }
+  }
   identity(channel, { requireActive = false } = {}) {
     const repository = this.store.storage?.agentDefinitions;
     if (!repository) throw Object.assign(new Error('Agent storage unavailable.'), { status: 503 });
@@ -166,7 +228,11 @@ class AgentRunner {
     if (!agent) throw Object.assign(new Error('The session Agent no longer exists.'), { status: 409 });
     return agent;
   }
-  validateConfig(config) {
+  validateConfig(config, identity) {
+    if (this.isNativeIdentity(identity)) {
+      if (!['plan', 'agent'].includes(config?.mode)) throw Object.assign(new Error('原生客户端请选择只读分析或实施模式。'), { status: 400 });
+      return { ...this.nativeConfigDefaults(identity), mode: config.mode, autoCompact: false };
+    }
     const providerId = config?.provider || config?.connectionId;
     const known = this.configManager
       ? Boolean(this.configManager.getConnection(providerId))
@@ -317,6 +383,11 @@ class AgentRunner {
       return;
     const channel = event.target.replace(/^channel\//, "");
     if (!this.store.getChannel(channel)) return;
+    if (this.recoveryFailure) this.assertRecoveryReady();
+    if (this.isRecoveryBlocked()) {
+      this.post(channel, "system", "系统正在执行数据恢复与回滚，暂时无法执行新任务。", { runtime_status: true });
+      return;
+    }
     const execution = this.resolveExecution(event, channel);
     if (execution === false) return;
     const executionKey = execution?.executionKey || channel;
@@ -367,12 +438,23 @@ class AgentRunner {
     return this.collaboration.resolve(event, channel) || false;
   }
   async run(channel, event, {compactOnly=false, executionKey=channel, execution}={}) {
+    if (this.recoveryFailure) this.assertRecoveryReady();
     execution = execution === undefined ? this.resolveExecution(event, channel) : execution;
     if (execution === false) return;
     executionKey = execution?.executionKey || executionKey;
     const agentIdentity = execution?.actor || this.identity(channel, { requireActive: true });
+    if (agentIdentity.connectionId && this.store.storage?.agentConnections) {
+      const broken = this.store.storage.agentConnections.hasBrokenChangeState(agentIdentity.connectionId);
+      if (broken) {
+        const msg = `该 Agent 连接存在未恢复的多文件配置写入故障 (${broken.id})，已阻止在混合配置上启动任务。`;
+        if (execution) throw Object.assign(new Error(msg), { status: 409, code: 'CONFIG_APPLY_INCOMPLETE' });
+        this.post(channel, 'system', msg, { runtime_status: true });
+        return;
+      }
+    }
     const executionPolicy = policyOf(agentIdentity);
-    const config = this.validateConfig(execution?.config || this.config(channel, agentIdentity));
+    const native = this.isNativeIdentity(agentIdentity);
+    const config = this.validateConfig(execution?.config || this.config(channel, agentIdentity), agentIdentity);
     config.mode = restrictMode(config.mode, executionPolicy.maxMode);
     const agent = agentIdentity.id;
     const laneWorktree = execution?.projectDir || event.metadata?.worktree_path;
@@ -397,9 +479,14 @@ class AgentRunner {
     }
     const workingDir = execution?.projectDir || (isParallelLane ? laneWorktree : (channelWorkingDir || null));
     const key = projectKey(workingDir);
-    if (this.workspaceOperations.has(channel) || key && ([...this.restoring].some(other => overlaps(other,key)) || [...this.active.values()].some(other => {
+    if (this.isRecoveryBlocked() || this.workspaceOperations.has(channel) || key && ([...this.restoring].some(other => overlaps(other,key)) || [...this.active.values()].some(other => {
       return overlaps(projectKey(other.snapshot.workingDir), key) && (other.snapshot.mode === 'agent' || config.mode === 'agent');
     }))) {
+      if (this.isRecoveryBlocked()) {
+        if (execution) throw Object.assign(new Error('System recovery is in progress; tasks cannot be started.'), { status: 409 });
+        this.post(channel, 'system', '系统正在执行数据恢复与回滚，暂时无法执行新任务。', { runtime_status: true });
+        return;
+      }
       if (execution) throw Object.assign(new Error('Project is busy or restoring; collaboration task was not started.'), { status: 409 });
       this.post(channel, 'system', '此项目有任务正在执行或撤销。为避免文件冲突，请等待结束后重新发送。', { runtime_status: true });
       if (this.store.storage && event.metadata?.routine_run_id) {
@@ -422,9 +509,10 @@ class AgentRunner {
     }
     if (event.metadata?.runtime_queued) { delete event.metadata.runtime_queued; this.store.save(); }
     const identitySnapshot = { id: agentIdentity.id, name: agentIdentity.name, role: agentIdentity.role,
-      revision: agentIdentity.revision, runtimeKind: agentIdentity.runtimeKind };
+      revision: agentIdentity.revision, runtimeKind: agentIdentity.runtimeKind, ...(agentIdentity.connectionId ? { connectionId: agentIdentity.connectionId } : {}) };
     const run = {
       runId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
       controller: new AbortController(),
       id: `reply-${crypto.randomUUID()}`,
       agent,
@@ -495,7 +583,9 @@ class AgentRunner {
     };
     run.done = new Promise(resolve => { run.resolve = resolve; });
     this.active.set(executionKey, run);
-    const effectiveTimeout = Math.min(this.timeoutMs, (executionPolicy.limits.maxDurationSeconds || Infinity) * 1000);
+    const nativeBudgetDurations = native ? [this.store.storage?.budgets.get()?.maxDurationSeconds, this.store.storage?.budgets.getForSession(channel)?.maxDurationSeconds] : [];
+    const effectiveTimeout = Math.min(this.timeoutMs, (executionPolicy.limits.maxDurationSeconds || Infinity) * 1000,
+      ...nativeBudgetDurations.map(seconds => (seconds || Infinity) * 1000));
     run.snapshot.timeoutMs = effectiveTimeout;
     const timer = setTimeout(() => {
       run.timedOut = true;
@@ -505,6 +595,11 @@ class AgentRunner {
     try {
       this.updateTurn(channel, agent, "running", "", agentIdentity, executionKey);
       this.broadcaster.broadcastComposing(channel, agent);
+      if (native) {
+        this.validateNativeExecution(agentIdentity, config, { channel, execution, compactOnly });
+        run.snapshot.accountingScope = 'native-turn';
+        run.hasUnknownCost = true;
+      }
       const conn = this.configManager ? this.configManager.getConnection(config.provider) : null;
       const provider = PROVIDERS[config.provider];
       const protocol = conn?.protocol || (config.provider === 'claude' ? 'anthropic' : config.provider === 'ollama' ? 'ollama' : 'openai');
@@ -518,7 +613,7 @@ class AgentRunner {
         ? this.configManager.getConnectionSecret(config.provider)
         : (provider?.key ? this.env[provider.key] : null);
 
-      if (!isOllama && !key) {
+      if (!native && !isOllama && !key) {
         throw new Error(
           `请先在设置中配置 ${conn?.name || provider?.label || config.provider} 的 API Key。`,
         );
@@ -654,7 +749,14 @@ class AgentRunner {
       const resource = executionPolicy.modelResource;
       const maxOutputTokens = resource?.connectionId === config.provider && resource.modelId === config.model ? resource.maxOutputTokens : undefined;
       run.snapshot.maxOutputTokens = maxOutputTokens || null;
-      const result = usesPi ? await this.piRuntime({
+      const nativeConnection = native && agentIdentity.connectionId && this.store.storage?.agentConnections
+        ? this.store.storage.agentConnections.get(agentIdentity.connectionId)
+        : null;
+      const invokeEngine = native
+        ? opts => this.nativeRuntime(agentIdentity, { ...opts, runId: run.runId, agentId: agentIdentity.id, connection: nativeConnection, sessionBindings: this.store.storage?.nativeSessionBindings || null, env: this.env })
+        : this.piRuntime;
+      const result = native || usesPi ? await invokeEngine({
+        nativeModel: agentIdentity.runtimeModel || undefined,
         config: { ...config, protocol },
         contextKey: execution?.contextKey,
         allowedTools: agentIdentity.profileTools || undefined,
@@ -675,7 +777,22 @@ class AgentRunner {
         baseUrl: base,
         apiKey: key || 'ollama',
         signal: run.controller.signal,
-        onDelta: content=>{if(record.phase!=='generating')phase('generating');onDelta(content);},
+        onHumanInteraction: native ? spec => {
+          this.interactions ||= new HumanInteractions(this.store.storage, event => this.broadcaster.broadcast(event));
+          return this.interactions.request({ ...spec, runId: run.runId, attemptId: run.attemptId, channel,
+            agentId: agentIdentity.id, agentName: agentIdentity.name }, {
+            signal: run.controller.signal,
+            onWaiting: kind => phase(kind === 'approval' ? 'waiting_approval' : 'waiting_input'),
+            onResumed: () => { if (!run.controller.signal.aborted) phase('generating'); },
+          });
+        } : undefined,
+        onHumanInteractionSent: id => this.interactions?.sent(id),
+        onHumanInteractionProgress: () => this.interactions?.progress(run.runId),
+        onExtensionNotification: notice => {
+          run.snapshot.nativeNotification = { method: notice.method, message: String(notice.message || notice.statusText || '').slice(0, 2000) };
+          this.broadcaster.broadcast({ type: 'workspace.agent.notification', target: `channel/${channel}`, payload: run.snapshot.nativeNotification });
+        },
+        onDelta: content=>{if(record.phase!=='generating' && !this.interactions?.isWaiting(run.runId))phase('generating');onDelta(content);},
         onUsage: usage=>{run.usage=usage;},
         checkBudget: currentTurnUsage => {
           if (!this.store.storage) return { allowed: true };
@@ -828,9 +945,21 @@ class AgentRunner {
       });
       if (run.controller.signal.aborted) throw new Error("Aborted");
       if (result?.usage) run.usage = result.usage;
+      if (result?.nativeSessionId || result?.nativeThreadId) {
+        run.snapshot.nativeSessionId = result.nativeSessionId || result.nativeThreadId;
+      }
+      if (result?.model) {
+        run.snapshot.effectiveModel = result.model;
+      }
+      if (result?.toolPolicy) {
+        run.snapshot.nativeToolPolicy = result.toolPolicy;
+      }
+      if (native && result?.costKnown && typeof result.estimatedCost === 'number') {
+        run.hasUnknownCost = false;
+      }
       if (this.store.storage && result?.usage) {
         try {
-          const pricingInfo = this.store.storage.pricing.calculateCost({
+          const pricingInfo = native ? { estimatedCost: result?.costKnown && typeof result.estimatedCost === 'number' ? result.estimatedCost : null, currency: 'USD', pricingVersion: result?.costKnown ? 'native-reported' : null } : this.store.storage.pricing.calculateCost({
             provider: pricingProvider,
             modelId: result.model || config.model,
             promptTokens: result.usage.prompt_tokens,
@@ -851,7 +980,7 @@ class AgentRunner {
             currency: pricingInfo.currency || 'USD',
           });
 
-          if (!run.requestUsageCount) this.store.storage.usage.recordModelRequest({
+          if (!native && !run.requestUsageCount) this.store.storage.usage.recordModelRequest({
             runId: run.runId,
             sessionId: channel,
             provider: pricingProvider,
@@ -934,15 +1063,16 @@ class AgentRunner {
         isError: result ? result.isError : false,
       };
     } catch (error) {
-      const stopped = run.controller.signal.aborted && !run.timedOut;
+      const stopped = (run.controller.signal.aborted || error.code === 'ABORT_ERR') && !run.timedOut;
       const budgetExceeded = error.code === 'BUDGET_EXCEEDED';
+      const nativeFailure = typeof error.code === 'string' && (error.code.startsWith('RUNTIME_') || error.code.startsWith('INTERACTION_') || ['INVALID_NATIVE_QUESTION','AUTH_INPUT_NOT_ALLOWED'].includes(error.code));
       const classified = categorizeError(error.status,error.message);
-      const message = budgetExceeded ? error.message : stopped
+      const message = budgetExceeded || nativeFailure ? error.message : stopped
         ? "Response stopped by user."
         : run.timedOut
           ? "The run timed out. Completed changes are preserved."
           : classified.code !== 'PROTOCOL_ERROR' ? classified.message : error.message;
-      record.error = { code: budgetExceeded ? 'BUDGET_EXCEEDED' : run.timedOut ? 'TIMEOUT' : stopped ? 'CANCELLED' : classified.code, message };
+      record.error = { code: budgetExceeded ? 'BUDGET_EXCEEDED' : run.timedOut ? 'TIMEOUT' : stopped ? 'CANCELLED' : nativeFailure ? error.code : classified.code, message };
       record.outcome=budgetExceeded?'limited':run.timedOut?'timed_out':stopped?(run.shutdown?'interrupted':'cancelled'):'failed';
       const facts=await evidence(record.outcome);record.evidence=facts;
       this.post(
@@ -994,6 +1124,7 @@ class AgentRunner {
     } finally {
       clearTimeout(timer);
       try {
+        this.interactions?.finish(run.runId);
         if (execution && !run.collaborationFinished) this.collaboration.finish(execution, run, record, null);
         this.tools.cancel(run);
         record.ended_at=Date.now();phase('finished');
@@ -1053,6 +1184,14 @@ class AgentRunner {
         }
       } catch (_) {}
     }
+    if (this.store.storage?.pipelines) {
+      try {
+        const pipeline = this.store.storage.pipelines.get(channel);
+        if (pipeline && pipeline.active) {
+          this.store.storage.pipelines.pause(channel);
+        }
+      } catch (_) {}
+    }
     return { stopped: Boolean(run) || laneRunsStopped > 0, cancelled_queued: queued };
   }
   restoreRoot(channel, run) {
@@ -1076,6 +1215,7 @@ class AgentRunner {
     }
   }
   async restore(channel, id) {
+    if (this.isRecoveryBlocked()) throw Object.assign(new Error('System recovery is in progress; cannot restore during recovery.'), { status: 409 });
     const run=this.store.data.runtime_runs.find(row=>row.id===id && row.channel===channel);
     if(!run || !run.outcome) throw Object.assign(new Error('只能撤销此会话已经结束的任务。'),{status:409});
     const target = this.restoreRoot(channel, run), root = target.root, key=projectKey(root);
@@ -1093,11 +1233,13 @@ class AgentRunner {
     } finally {this.restoring.delete(key);}
   }
   compact(channel) {
+    if (this.isRecoveryBlocked()) throw Object.assign(new Error('System recovery is in progress.'), { status: 409 });
     if(this.active.has(channel)) throw Object.assign(new Error('Stop the current run before compacting.'),{status:409});
     if(!this.store.getChannel(channel)) throw Object.assign(new Error('Session not found.'),{status:404});
     return this.run(channel,{payload:{content:''}}, {compactOnly:true});
   }
   async close() {
+    this.interactions?.close();
     const runs = [...this.active.values()];
     for (const run of runs) run.shutdown = true;
     for (const channel of new Set(runs.map(run => run.snapshot.channel))) this.stop(channel);

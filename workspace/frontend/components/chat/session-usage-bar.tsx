@@ -26,6 +26,7 @@ import {
 import type { WorkspaceMessage } from "@/lib/types";
 import { toast } from '@/lib/toast';
 import { RunRecoveryPanel } from './run-recovery-panel';
+import { AgentInteractionsPanel } from './agent-interactions-panel';
 import { WorktreeControls } from './worktree-controls';
 
 interface RuntimeStatus {
@@ -234,6 +235,7 @@ export function SessionUsageBar({
     <>
       <WorktreeControls channel={channelName} running={running} />
       <RunRecoveryPanel channel={channelName} running={running} />
+      <AgentInteractionsPanel channel={channelName} running={running} />
       <div
         className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 text-[10px] text-foreground-extra-muted"
         data-testid="session-usage-bar"
@@ -245,6 +247,8 @@ export function SessionUsageBar({
           {runtime?.running || running
             ? live?.phase === 'waiting_approval'
               ? '等待审批'
+              : live?.phase === 'waiting_input'
+                ? '等待你的回答'
               : live?.phase === 'compacting'
                 ? '正在压缩'
                 : '运行中'

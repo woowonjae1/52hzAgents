@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Dialog as DialogPrimitive } from 'radix-ui';
 import {
   Bot,
   Plus,
@@ -22,6 +23,7 @@ import {
   Info,
   Loader2,
   Check,
+  FileEdit,
   MessageSquare,
   Copy,
 } from 'lucide-react';
@@ -31,10 +33,21 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { workspaceApi, type AgentDefinition, type AgentIdentityInput } from '@/lib/api';
+import { workspaceApi, type AgentDefinition, type AgentIdentityInput, type AgentRuntimeKind, type AgentRuntimeStatus } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import type { ConnectionItem } from './router-provider-settings';
+import { NativeAgentConnectionsPanel } from './native-agent-connections-panel';
+
+const agentStarters = [
+  { name: '开发助手', role: 'developer', description: '分析实现方案，完成有权限执行的代码修改。', maxMode: 'agent' as const,
+    instructions: '先读取项目规范与相关代码，给出范围明确的实现方案。仅在已获文件修改权限时编辑，命令执行必须遵守审批。报告实际完成的修改、验证结果和未完成项。' },
+  { name: '代码审阅', role: 'reviewer', description: '检查变更、潜在缺陷与回归风险，不修改代码。', maxMode: 'plan' as const,
+    instructions: '只读检查项目与代码变更。优先报告有证据的缺陷、影响范围、文件位置及验证建议；区分确定的问题与待验证的推断，不声称执行未运行的检查。' },
+  { name: '测试验证', role: 'tester', description: '梳理测试场景，检查行为和交付证据。', maxMode: 'agent' as const,
+    instructions: '根据需求检查实现与测试覆盖，设计能发现实际缺陷的验证场景。未获命令权限和审批时只做分析；获准执行后记录实际结果，不把模拟结果当作真实环境验收。' },
+];
+const modeNames = { chat: '对话', plan: '只读分析', agent: '实施' };
 
 interface AgentDefinitionsSettingsProps {
   onManageConnections?: () => void;
@@ -46,6 +59,11 @@ export function AgentDefinitionsSettings({
   onSelectAgentForChat,
 }: AgentDefinitionsSettingsProps) {
   const [agents, setAgents] = React.useState<AgentDefinition[]>([]);
+  const [runtimes, setRuntimes] = React.useState<AgentRuntimeStatus[]>([]);
+  const [formRuntime, setFormRuntime] = React.useState<AgentRuntimeKind>('pi');
+  const [formRuntimeModel, setFormRuntimeModel] = React.useState('');
+  const [formNativeConnectionId, setFormNativeConnectionId] = React.useState<string | null>(null);
+  const [focusedConnectionId, setFocusedConnectionId] = React.useState<string | null>(null);
   const [connections, setConnections] = React.useState<ConnectionItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -86,17 +104,156 @@ export function AgentDefinitionsSettings({
   const [limitCost, setLimitCost] = React.useState('');
 
   // Conflict / Draft retention
+  const DRAFT_KEY = '52hz_agent_definition_draft_v1';
   const [conflictDraft, setConflictDraft] = React.useState<string | null>(null);
+  const [showConflictJson, setShowConflictJson] = React.useState(false);
+  const [reloadingConflict, setReloadingConflict] = React.useState(false);
+  const [overwritingConflict, setOverwritingConflict] = React.useState(false);
+  const [hasSavedDraft, setHasSavedDraft] = React.useState(false);
+
+  // Check draft on mount
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.formName) {
+          setHasSavedDraft(true);
+        }
+      }
+    } catch (_) {}
+  }, []);
+
+  const clearDraft = React.useCallback(() => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      setHasSavedDraft(false);
+    } catch (_) {}
+  }, []);
+
+  const saveDraft = React.useCallback(() => {
+    if (!formName.trim() && !formRole.trim() && !formInstructions.trim()) return;
+    const draft = {
+      editingAgentId: editingAgent?.id || null,
+      formName,
+      formRuntime,
+      formRuntimeModel,
+      formRole,
+      formDescription,
+      formInstructions,
+      formDefaultMode,
+      formMaxMode,
+      formStatus,
+      permReadFiles,
+      permWriteFiles,
+      permExecuteCommands,
+      permKnowledge,
+      permMcp,
+      permDelegate,
+      hasCustomResource,
+      formConnectionId,
+      formModelId,
+      formMaxOutputTokens,
+      limitTokens,
+      limitSteps,
+      limitDuration,
+      limitCost,
+      savedAt: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      setHasSavedDraft(true);
+    } catch (_) {}
+  }, [
+    editingAgent,
+    formName,
+    formRuntime,
+    formRuntimeModel,
+    formRole,
+    formDescription,
+    formInstructions,
+    formDefaultMode,
+    formMaxMode,
+    formStatus,
+    permReadFiles,
+    permWriteFiles,
+    permExecuteCommands,
+    permKnowledge,
+    permMcp,
+    permDelegate,
+    hasCustomResource,
+    formConnectionId,
+    formModelId,
+    formMaxOutputTokens,
+    limitTokens,
+    limitSteps,
+    limitDuration,
+    limitCost,
+  ]);
+
+  // Auto-save draft when editing
+  React.useEffect(() => {
+    if (!isEditing) return;
+    saveDraft();
+  }, [isEditing, saveDraft]);
+
+  const handleRestoreDraft = () => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const d = JSON.parse(saved);
+      if (d.editingAgentId) {
+        const ag = agents.find((a) => a.id === d.editingAgentId) || null;
+        setEditingAgent(ag);
+      } else {
+        setEditingAgent(null);
+      }
+      setFormName(d.formName || '');
+      setFormRuntime(d.formRuntime || 'pi');
+      setFormRuntimeModel(d.formRuntimeModel || '');
+      setFormRole(d.formRole || 'assistant');
+      setFormDescription(d.formDescription || '');
+      setFormInstructions(d.formInstructions || '');
+      setFormDefaultMode(d.formDefaultMode || 'chat');
+      setFormMaxMode(d.formMaxMode || 'agent');
+      setFormStatus(d.formStatus || 'active');
+      setPermReadFiles(Boolean(d.permReadFiles));
+      setPermWriteFiles(Boolean(d.permWriteFiles));
+      setPermExecuteCommands(Boolean(d.permExecuteCommands));
+      setPermKnowledge(Boolean(d.permKnowledge));
+      setPermMcp(Boolean(d.permMcp));
+      setPermDelegate(Boolean(d.permDelegate));
+      setHasCustomResource(Boolean(d.hasCustomResource));
+      setFormConnectionId(d.formConnectionId || '');
+      setFormModelId(d.formModelId || '');
+      setFormMaxOutputTokens(d.formMaxOutputTokens || '');
+      setLimitTokens(d.limitTokens || '');
+      setLimitSteps(d.limitSteps || '');
+      setLimitDuration(d.limitDuration || '');
+      setLimitCost(d.limitCost || '');
+      setIsEditing(true);
+      toast.success('已恢复上次未保存的草稿');
+    } catch {
+      toast.error('无法恢复草稿');
+    }
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft();
+    toast.info('已清除草稿');
+  };
 
   const loadData = React.useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     else setRefreshing(true);
     try {
-      const [agentsRes, connRes] = await Promise.all([
+      const [agentsRes, connRes, runtimeRes] = await Promise.all([
         workspaceApi.listAgentDefinitions(true),
         workspaceApi.request<{ connections: ConnectionItem[] }>('/v1/settings/connections').catch(() => ({ connections: [] })),
+        workspaceApi.listAgentRuntimes(),
       ]);
       setAgents(agentsRes?.agents || []);
+      setRuntimes(runtimeRes.runtimes);
       setConnections(connRes?.connections || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '加载 Agent 列表失败');
@@ -110,14 +267,17 @@ export function AgentDefinitionsSettings({
     void loadData();
   }, [loadData]);
 
-  const openCreate = () => {
+  const openCreate = (starter?: (typeof agentStarters)[number]) => {
+    setFormRuntime('pi');
+    setFormNativeConnectionId(null);
+    setFormRuntimeModel('');
     setEditingAgent(null);
-    setFormName('');
-    setFormRole('assistant');
-    setFormDescription('');
-    setFormInstructions('');
-    setFormDefaultMode('chat');
-    setFormMaxMode('agent');
+    setFormName(starter?.name || '');
+    setFormRole(starter?.role || 'assistant');
+    setFormDescription(starter?.description || '');
+    setFormInstructions(starter?.instructions || '');
+    setFormDefaultMode(starter ? 'plan' : 'chat');
+    setFormMaxMode(starter?.maxMode || 'agent');
     setFormStatus('active');
     // Conservative defaults
     setPermReadFiles(true);
@@ -150,8 +310,11 @@ export function AgentDefinitionsSettings({
   };
 
   const openDuplicate = (agent: AgentDefinition) => {
+    setFormRuntime(agent.runtimeKind);
+    setFormRuntimeModel(agent.runtimeModel || '');
     setEditingAgent(null);
     setFormName(`${agent.name} (副本)`);
+    setFormNativeConnectionId(agent.connectionId || null);
     setFormRole(agent.role || 'assistant');
     setFormDescription(agent.description || '');
     setFormInstructions(agent.instructions || '');
@@ -198,8 +361,11 @@ export function AgentDefinitionsSettings({
   };
 
   const openEdit = (agent: AgentDefinition) => {
+    setFormRuntime(agent.runtimeKind);
+    setFormRuntimeModel(agent.runtimeModel || '');
     setEditingAgent(agent);
     setFormName(agent.name);
+    setFormNativeConnectionId(agent.connectionId || null);
     setFormRole(agent.role || 'assistant');
     setFormDescription(agent.description || '');
     setFormInstructions(agent.instructions || '');
@@ -254,6 +420,9 @@ export function AgentDefinitionsSettings({
     }
 
     const payload: AgentIdentityInput = {
+      runtimeKind: formRuntime,
+      connectionId: formNativeConnectionId,
+      runtimeModel: (formRuntime !== 'pi' || formNativeConnectionId) ? formRuntimeModel.trim() || null : null,
       name: trimmedName,
       role: formRole.trim() || 'assistant',
       description: formDescription.trim(),
@@ -269,7 +438,7 @@ export function AgentDefinitionsSettings({
         mcp: permMcp,
         delegate: permDelegate,
       },
-      modelResource: hasCustomResource && formConnectionId && formModelId.trim()
+      modelResource: formRuntime === 'pi' && !formNativeConnectionId && hasCustomResource && formConnectionId && formModelId.trim()
         ? {
             connectionId: formConnectionId,
             modelId: formModelId.trim(),
@@ -298,6 +467,7 @@ export function AgentDefinitionsSettings({
         await workspaceApi.createAgentDefinition(payload);
         toast.success(`Agent "${trimmedName}" 已创建`);
       }
+      clearDraft();
       setIsEditing(false);
       setEditingAgent(null);
       await loadData(true);
@@ -346,11 +516,24 @@ export function AgentDefinitionsSettings({
   };
 
   const checkReadiness = (agent: AgentDefinition) => {
+    if (agent.connectionId) {
+      return {
+        ready: false,
+        label: '已关联原生配置 · 待任务验证',
+        reason: agent.execution?.note || '复用本机客户端配置，无需工作台模型连接；实际可用性需通过任务执行确认。',
+        warning: false,
+      };
+    }
+    if (agent.runtimeKind !== 'pi') {
+      const runtime = runtimes.find(item => item.kind === agent.runtimeKind);
+      return { ready: false, label: runtime?.installed ? runtime.supported ? '客户端已检测 · 待任务验证' : '适配待完成' : '客户端未检测到',
+        reason: runtime?.reason || '请刷新客户端检测状态。', warning: !runtime?.installed || !runtime.supported };
+    }
     if (!agent.modelResource) {
       return {
         ready: false,
-        label: '未绑定模型资源',
-        reason: '该 Agent 未配置独立的执行资源，将继承系统默认连接。',
+        label: '待配置执行资源',
+        reason: '单人会话可使用默认连接；参加协作前需为此 Agent 绑定执行资源。',
         warning: false,
       };
     }
@@ -373,8 +556,8 @@ export function AgentDefinitionsSettings({
     }
     return {
       ready: true,
-      label: '就绪',
-      reason: `${conn.name || conn.id} · ${agent.modelResource.modelId}`,
+      label: '已配置',
+      reason: '执行资源已绑定；远端连接可用性需通过连接测试确认。',
       warning: false,
     };
   };
@@ -386,24 +569,13 @@ export function AgentDefinitionsSettings({
         <div>
           <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
             <Bot className="size-4 text-primary" />
-            <span>Agent 智能体管理</span>
+            <span>Agent</span>
           </h2>
           <p className="text-2xs text-foreground-muted mt-0.5">
-            Agent 是具备独立职责、指令与工具权限的执行主体。模型连接作为其底层执行资源按需配置。
+            管理协作成员、执行客户端与权限。选择 Agent 后，由工作台分派任务。
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {onManageConnections && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onManageConnections}
-              className="text-xs h-8 gap-1.5"
-            >
-              <Cpu className="size-3.5 text-foreground-muted" />
-              <span>资源连接配置</span>
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
@@ -417,7 +589,7 @@ export function AgentDefinitionsSettings({
           </Button>
           <Button
             size="sm"
-            onClick={openCreate}
+            onClick={() => openCreate()}
             className="text-xs h-8 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="size-3.5" />
@@ -425,6 +597,68 @@ export function AgentDefinitionsSettings({
           </Button>
         </div>
       </div>
+
+      {!loading && (
+        <NativeAgentConnectionsPanel onMemberCreated={() => void loadData(true)} selectedConnectionId={focusedConnectionId} />
+      )}
+      {!loading && (
+        <section className="rounded-lg border border-border px-4 py-3 space-y-3" aria-label="本地执行客户端">
+          <h3 className="text-xs font-medium">本地执行客户端</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {runtimes.map(runtime => (
+              <div key={runtime.kind} className="rounded-md border border-border/60 px-3 py-2 space-y-1">
+                <div className="flex items-center justify-between text-xs"><span>{runtime.name}</span><span className="text-2xs text-foreground-muted">{runtime.kind === 'pi' ? '内置' : runtime.installed ? runtime.supported ? '已检测' : '适配待完成' : '未安装'}</span></div>
+                <p className="text-2xs text-foreground-muted">{runtime.reason}</p>
+                {runtime.installed && runtime.supported && <button type="button" className="text-2xs underline underline-offset-2" onClick={() => {
+                  openCreate(); setFormRuntime(runtime.kind); setFormName(`${runtime.name} 助手`);
+                  if (runtime.kind !== 'pi') {
+                    setFormDefaultMode('plan'); setFormMaxMode('plan'); setPermReadFiles(false); setPermExecuteCommands(true); setPermKnowledge(false);
+                  }
+                }}>{runtime.kind === 'pi' ? '添加为协作成员' : '创建 Agent（接入预览）'}</button>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {!loading && (
+        <section className="rounded-lg border border-border px-4 py-3 space-y-3" aria-label="添加协作成员">
+          <div>
+            <h3 className="text-xs font-medium">添加协作成员</h3>
+            <p className="mt-1 text-xs leading-5 text-foreground-muted">{agents.filter(agent => agent.status === 'active').length < 2 ? '当前尚未组成多 Agent 团队。' : ''}选择职责后可检查指令与权限，保存才会创建成员，不会自动执行任务。</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {agentStarters.map(starter => <Button key={starter.role} type="button" variant="outline" size="sm" onClick={() => openCreate(starter)}>{starter.name}</Button>)}
+          </div>
+          <p className="text-2xs text-foreground-muted">默认仅允许读取与分析。文件修改、命令执行和委派需在能力设置中分别开启。</p>
+        </section>
+      )}
+
+      {/* Draft Recovery Banner */}
+      {hasSavedDraft && !isEditing && (
+        <div className="p-3.5 rounded-xl border border-primary/40 bg-primary/10 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-foreground">
+            <FileEdit className="size-4 text-primary shrink-0" />
+            <span className="font-medium">发现未保存的 Agent 编辑草稿。</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDiscardDraft}
+              className="h-7 px-2.5 text-2xs text-muted-foreground hover:text-foreground"
+            >
+              丢弃草稿
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleRestoreDraft}
+              className="h-7 px-3 text-2xs bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              恢复并继续编辑
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Main List */}
       {loading ? (
@@ -439,7 +673,7 @@ export function AgentDefinitionsSettings({
           <p className="text-2xs text-foreground-muted mt-1 max-w-sm mx-auto">
             创建具有特定职责和工具权限的 Agent，协同完成复杂的编码与分析任务。
           </p>
-          <Button size="sm" onClick={openCreate} className="mt-4 text-xs h-8 gap-1.5">
+          <Button size="sm" onClick={() => openCreate()} className="mt-4 text-xs h-8 gap-1.5">
             <Plus className="size-3.5" />
             <span>创建第一个 Agent</span>
           </Button>
@@ -481,6 +715,9 @@ export function AgentDefinitionsSettings({
                         >
                           {agent.role}
                         </Badge>
+                        <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
+                          {agent.execution?.label || runtimes.find(item => item.kind === agent.runtimeKind)?.name || agent.runtimeKind}{agent.execution?.compatibility === 'legacy-builtin' ? ' · 兼容' : ''}
+                        </Badge>
                         {isDisabled && (
                           <Badge variant="warning" size="sm" className="text-3xs">
                             已停用
@@ -521,7 +758,7 @@ export function AgentDefinitionsSettings({
                         <span className="flex items-center gap-1" title="默认与最高模式">
                           <Layers className="size-3 text-foreground-muted" />
                           <span>
-                            {agent.defaultMode} → {agent.maxMode}
+                            {modeNames[agent.defaultMode]} · 上限：{modeNames[agent.maxMode]}
                           </span>
                         </span>
                         <span className="text-border/70">·</span>
@@ -548,20 +785,24 @@ export function AgentDefinitionsSettings({
                             {agent.permissions.executeCommands ? '终端命令' : '无终端'}
                           </span>
                         </span>
-                        {agent.modelResource && (
-                          <>
-                            <span className="text-border/70">·</span>
-                            <span className="font-mono text-foreground-muted truncate max-w-xs">
-                              {agent.modelResource.connectionId} / {agent.modelResource.modelId}
-                            </span>
-                          </>
-                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Row Operations */}
                   <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                    {agent.connectionId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFocusedConnectionId(agent.connectionId || null)}
+                        className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
+                        title="查看或修改关联的原生客户端配置"
+                      >
+                        <Cpu className="size-3" />
+                        <span>原生配置</span>
+                      </Button>
+                    )}
                     {onSelectAgentForChat && !isDisabled && (
                       <Button
                         variant="ghost"
@@ -598,6 +839,7 @@ export function AgentDefinitionsSettings({
                       variant="ghost"
                       size="sm"
                       onClick={() => void handleToggleStatus(agent)}
+                      disabled={isBuiltIn}
                       className={cn(
                         'h-7 px-2 text-2xs gap-1',
                         isDisabled
@@ -630,18 +872,24 @@ export function AgentDefinitionsSettings({
 
       {/* Edit / Create Form Modal */}
       {isEditing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl border border-border/80 bg-surface1 p-6 shadow-xl space-y-6 my-auto">
+        <DialogPrimitive.Root open={isEditing} onOpenChange={open => { if (!saving) setIsEditing(open); }}>
+          <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60" />
+          <DialogPrimitive.Content aria-describedby={undefined} onEscapeKeyDown={event => { event.stopPropagation(); if (saving) event.preventDefault(); }} className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface1 p-6 shadow-xl space-y-6 outline-none">
             <div className="flex items-center justify-between pb-3 border-b border-border/60">
               <div className="flex items-center gap-2">
                 <Bot className="size-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">
+                <DialogPrimitive.Title className="text-sm font-semibold text-foreground">
                   {editingAgent ? `编辑 Agent · ${editingAgent.name}` : '新建 Agent'}
-                </h3>
+                </DialogPrimitive.Title>
               </div>
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  clearDraft();
+                  setIsEditing(false);
+                  setEditingAgent(null);
+                }}
                 className="text-xs text-foreground-muted hover:text-foreground"
               >
                 取消
@@ -649,18 +897,169 @@ export function AgentDefinitionsSettings({
             </div>
 
             {conflictDraft && (
-              <div className="rounded-xl border border-status-warning/40 bg-status-warning/10 p-3 text-2xs text-status-warning space-y-2">
-                <p className="font-semibold">检测到配置冲突：已被其他进程更新。请核对下方草稿。</p>
-                <textarea
-                  readOnly
-                  rows={4}
-                  value={conflictDraft}
-                  className="w-full rounded bg-surface0 p-2 font-mono text-3xs border border-border"
-                />
+              <div className="rounded-xl border border-status-warning/40 bg-status-warning/10 p-3.5 text-2xs text-status-warning space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs">
+                    <AlertTriangle className="size-4 text-status-warning shrink-0" />
+                    <span>检测到配置版本冲突：该 Agent 已在其他地方被更新</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={reloadingConflict}
+                      onClick={async () => {
+                        if (!editingAgent) return;
+                        setReloadingConflict(true);
+                        try {
+                          const latest = await workspaceApi.getAgentDefinition(editingAgent.id);
+                          setEditingAgent(latest);
+                          setFormRuntime(latest.runtimeKind);
+                          setFormRuntimeModel(latest.runtimeModel || '');
+                          setFormName(latest.name);
+                          setFormRole(latest.role);
+                          setFormDescription(latest.description);
+                          setFormInstructions(latest.instructions || '');
+                          setFormDefaultMode(latest.defaultMode || 'chat');
+                          setFormMaxMode(latest.maxMode || 'agent');
+                          setFormStatus(latest.status);
+                          setPermReadFiles(Boolean(latest.permissions?.readFiles));
+                          setPermWriteFiles(Boolean(latest.permissions?.writeFiles));
+                          setPermExecuteCommands(Boolean(latest.permissions?.executeCommands));
+                          setPermKnowledge(Boolean(latest.permissions?.knowledge));
+                          setPermMcp(Boolean(latest.permissions?.mcp));
+                          setPermDelegate(Boolean(latest.permissions?.delegate));
+                          if (latest.modelResource) {
+                            setHasCustomResource(true);
+                            setFormConnectionId(latest.modelResource.connectionId);
+                            setFormModelId(latest.modelResource.modelId);
+                            setFormMaxOutputTokens(latest.modelResource.maxOutputTokens ? String(latest.modelResource.maxOutputTokens) : '');
+                          } else {
+                            setHasCustomResource(false);
+                          }
+                          setLimitTokens(latest.limits?.maxTokensPerRun != null ? String(latest.limits.maxTokensPerRun) : '');
+                          setLimitSteps(latest.limits?.maxStepsPerRun != null ? String(latest.limits.maxStepsPerRun) : '');
+                          setLimitDuration(latest.limits?.maxDurationSeconds != null ? String(latest.limits.maxDurationSeconds) : '');
+                          setLimitCost(latest.limits?.maxCostPerRun != null ? String(latest.limits.maxCostPerRun) : '');
+                          setConflictDraft(null);
+                          toast.success('已从服务端重新加载最新版本');
+                        } catch {
+                          toast.error('重新加载最新版本失败');
+                        } finally {
+                          setReloadingConflict(false);
+                        }
+                      }}
+                      className="h-7 px-2.5 text-2xs border-status-warning/40 hover:bg-status-warning/20 text-foreground gap-1"
+                    >
+                      {reloadingConflict ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+                      <span>加载最新版本</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={overwritingConflict}
+                      onClick={async () => {
+                        if (!editingAgent) return;
+                        setOverwritingConflict(true);
+                        try {
+                          const latest = await workspaceApi.getAgentDefinition(editingAgent.id);
+                          const trimmedName = formName.trim();
+                          const payload: AgentIdentityInput = {
+                            runtimeKind: formRuntime,
+                            connectionId: formNativeConnectionId,
+      runtimeModel: (formRuntime !== 'pi' || formNativeConnectionId) ? formRuntimeModel.trim() || null : null,
+                            name: trimmedName,
+                            role: formRole.trim(),
+                            description: formDescription.trim(),
+                            status: formStatus,
+                            instructions: formInstructions.trim(),
+                            defaultMode: formDefaultMode,
+                            maxMode: formMaxMode,
+                            permissions: {
+                              readFiles: permReadFiles,
+                              writeFiles: permWriteFiles,
+                              executeCommands: permExecuteCommands,
+                              knowledge: permKnowledge,
+                              mcp: permMcp,
+                              delegate: permDelegate,
+                            },
+                            modelResource: formRuntime === 'pi' && !formNativeConnectionId && hasCustomResource && formConnectionId && formModelId.trim()
+                              ? {
+                                  connectionId: formConnectionId,
+                                  modelId: formModelId.trim(),
+                                  ...(formMaxOutputTokens.trim() && !isNaN(Number(formMaxOutputTokens))
+                                    ? { maxOutputTokens: parseInt(formMaxOutputTokens, 10) }
+                                    : {}),
+                                }
+                              : null,
+                            limits: {
+                              maxTokensPerRun: limitTokens ? parseInt(limitTokens, 10) : null,
+                              maxStepsPerRun: limitSteps ? parseInt(limitSteps, 10) : null,
+                              maxDurationSeconds: limitDuration ? parseInt(limitDuration, 10) : null,
+                              maxCostPerRun: limitCost ? parseFloat(limitCost) : null,
+                            },
+                          };
+                          await workspaceApi.updateAgentDefinition(editingAgent.id, {
+                            ...payload,
+                            expectedRevision: latest.revision,
+                          });
+                          toast.success(`已覆盖保存 Agent "${trimmedName}"`);
+                          setConflictDraft(null);
+                          clearDraft();
+                          setIsEditing(false);
+                          setEditingAgent(null);
+                          await loadData(true);
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : '覆盖保存失败');
+                        } finally {
+                          setOverwritingConflict(false);
+                        }
+                      }}
+                      className="h-7 px-2.5 text-2xs bg-status-warning text-black font-semibold hover:bg-status-warning/90 gap-1"
+                    >
+                      {overwritingConflict ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
+                      <span>强制以本地草稿覆盖</span>
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-3xs text-muted-foreground">
+                    <span>保留的本地草稿 JSON：</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowConflictJson(!showConflictJson)}
+                      className="text-primary hover:underline"
+                    >
+                      {showConflictJson ? '收起草稿' : '展开查看草稿'}
+                    </button>
+                  </div>
+                  {showConflictJson && (
+                    <textarea
+                      readOnly
+                      rows={5}
+                      value={conflictDraft}
+                      className="w-full rounded-lg bg-surface0 p-2 font-mono text-3xs border border-border text-foreground"
+                    />
+                  )}
+                </div>
               </div>
             )}
 
             <form onSubmit={handleSave} className="space-y-5 text-xs">
+              <div className="space-y-2">
+                <Label htmlFor="agent-execution-client">执行客户端</Label>
+                <select id="agent-execution-client" value={formRuntime} disabled={Boolean(editingAgent?.builtIn)} className="w-full rounded-md border border-border bg-surface0 p-2" onChange={event => {
+                  const kind = event.target.value as AgentRuntimeKind; setFormRuntime(kind);
+                  if (kind !== 'pi') {
+                    setFormDefaultMode('plan'); setFormMaxMode('plan'); setPermReadFiles(false); setPermWriteFiles(false); setPermExecuteCommands(true);
+                    setPermKnowledge(false); setPermMcp(false); setPermDelegate(false);
+                  }
+                }}>
+                  {runtimes.map(runtime => <option key={runtime.kind} value={runtime.kind} disabled={!runtime.installed || !runtime.supported}>{runtime.name}{!runtime.installed ? ' · 未安装' : !runtime.supported ? ' · 适配待完成' : ''}</option>)}
+                </select>
+                {formRuntime !== 'pi' && <p className="text-2xs text-foreground-muted">复用客户端现有登录与资源。当前版本可能读取项目外文件，需在下方明确开启读取权限后才能执行。暂不支持工作台 MCP、委派、知识工具及逐请求硬预算；不兼容的任务会被拦截。只读模式禁止写入；实施需写入和命令权限。</p>}
+              </div>
               {/* Group 1: 身份与职责 */}
               <div className="space-y-3">
                 <h4 className="text-2xs font-semibold uppercase tracking-wider text-foreground-extra-muted flex items-center gap-1.5">
@@ -669,8 +1068,10 @@ export function AgentDefinitionsSettings({
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2 space-y-1">
-                    <Label className="text-2xs text-foreground-muted">Agent 名称 *</Label>
+                    <Label htmlFor="agent-editor-name" className="text-2xs text-foreground-muted">Agent 名称 *</Label>
                     <Input
+                      id="agent-editor-name"
+                      autoFocus
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
                       placeholder="例如：系统架构师、代码重构助手"
@@ -679,8 +1080,9 @@ export function AgentDefinitionsSettings({
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-2xs text-foreground-muted">角色类型</Label>
+                    <Label htmlFor="agent-editor-role" className="text-2xs text-foreground-muted">角色类型</Label>
                     <Input
+                      id="agent-editor-role"
                       value={formRole}
                       onChange={(e) => setFormRole(e.target.value)}
                       placeholder="assistant"
@@ -689,8 +1091,9 @@ export function AgentDefinitionsSettings({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-2xs text-foreground-muted">职责描述</Label>
+                  <Label htmlFor="agent-editor-description" className="text-2xs text-foreground-muted">职责描述</Label>
                   <Input
+                    id="agent-editor-description"
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     placeholder="简述此 Agent 的专长与职责..."
@@ -706,6 +1109,7 @@ export function AgentDefinitionsSettings({
                   <span>工作指令 (System Instructions)</span>
                 </h4>
                 <Textarea
+                  aria-label="工作指令"
                   value={formInstructions}
                   onChange={(e) => setFormInstructions(e.target.value)}
                   placeholder="为该 Agent 设定专有的行为准则、思维框架与输出偏好..."
@@ -728,7 +1132,7 @@ export function AgentDefinitionsSettings({
                       onChange={(e) => setPermReadFiles(e.target.checked)}
                       className="rounded border-border accent-primary"
                     />
-                    <span>读取项目文件</span>
+                    <span>{formRuntime === 'pi' ? '读取项目文件' : '允许客户端读取文件（可能超出项目）'}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -813,11 +1217,19 @@ export function AgentDefinitionsSettings({
               </div>
 
               {/* Group 5: 执行资源 (高级) */}
-              <div className="space-y-2.5 pt-2 border-t border-border/50">
+              {(formRuntime !== 'pi' || Boolean(formNativeConnectionId)) && <details className="space-y-2.5 pt-2 border-t border-border/50">
+                <summary className="cursor-pointer text-xs font-medium text-foreground-muted">高级：客户端资源</summary>
+                <Label htmlFor="agent-native-resource">资源标识（可选）</Label>
+                <Input id="agent-native-resource" value={formRuntimeModel} onChange={event => setFormRuntimeModel(event.target.value)} placeholder="留空使用客户端默认配置" />
+                <p className="text-2xs text-foreground-muted">只覆盖此 Agent 的客户端资源，不更改本机客户端配置，不保存密钥。不可用时明确报错，不自动切换。</p>
+              </details>}
+              <details hidden={formRuntime !== 'pi' || Boolean(formNativeConnectionId)} className="space-y-2.5 pt-2 border-t border-border/50">
+                <summary className="cursor-pointer text-xs font-medium text-foreground-muted">高级：执行资源{!hasCustomResource ? ' · 待配置' : ''}</summary>
+                {onManageConnections && <button type="button" onClick={() => { saveDraft(); onManageConnections(); }} className="text-xs text-foreground-muted underline underline-offset-2">管理资源连接（保留当前草稿）</button>}
                 <div className="flex items-center justify-between">
                   <h4 className="text-2xs font-semibold uppercase tracking-wider text-foreground-extra-muted flex items-center gap-1.5">
                     <Cpu className="size-3 text-primary" />
-                    <span>执行资源 (模型与连接引用)</span>
+                    <span>执行资源</span>
                   </h4>
                   <label className="flex items-center gap-1.5 text-2xs cursor-pointer text-foreground-muted">
                     <input
@@ -826,14 +1238,14 @@ export function AgentDefinitionsSettings({
                       onChange={(e) => setHasCustomResource(e.target.checked)}
                       className="rounded border-border accent-primary"
                     />
-                    <span>自定义独立模型资源</span>
+                    <span>为此 Agent 绑定资源</span>
                   </label>
                 </div>
 
                 {hasCustomResource ? (
                   <div className="space-y-3 p-3 rounded-xl bg-surface2/30 border border-border/50">
                     <p className="text-2xs text-foreground-muted">
-                      指定此 Agent 专用的模型连接。不配置则自动继承系统默认连接。
+                      可复用现有连接，无需为每个 Agent 重复填写密钥。参加协作前需完成资源绑定。
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
@@ -881,10 +1293,10 @@ export function AgentDefinitionsSettings({
                   </div>
                 ) : (
                   <p className="text-2xs text-foreground-extra-muted italic">
-                    未配置独立资源，将继承全局连接。
+                    单人会话可使用默认连接；参加协作前需绑定执行资源。
                   </p>
                 )}
-              </div>
+              </details>
 
               {/* Group 6: 执行限制 (折叠) */}
               <div className="border-t border-border/50 pt-2">
@@ -966,8 +1378,9 @@ export function AgentDefinitionsSettings({
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+          </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+        </DialogPrimitive.Root>
       )}
     </div>
   );

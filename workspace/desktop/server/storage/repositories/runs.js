@@ -6,6 +6,7 @@ const PHASES = Object.freeze({
   GENERATING: 'generating',
   EXECUTING: 'executing',
   WAITING_APPROVAL: 'waiting_approval',
+  WAITING_INPUT: 'waiting_input',
   COMPACTING: 'compacting',
   CANCELLING: 'cancelling',
   FINISHED: 'finished',
@@ -24,10 +25,11 @@ const OUTCOMES = Object.freeze({
 
 const ALLOWED_TRANSITIONS = Object.freeze({
   queued: ['preparing', 'generating', 'cancelling', 'finished'],
-  preparing: ['generating', 'executing', 'cancelling', 'finished'],
-  generating: ['executing', 'waiting_approval', 'compacting', 'cancelling', 'finished'],
-  executing: ['generating', 'waiting_approval', 'compacting', 'cancelling', 'finished'],
-  waiting_approval: ['executing', 'cancelling', 'finished'],
+  preparing: ['generating', 'executing', 'waiting_input', 'waiting_approval', 'cancelling', 'finished'],
+  generating: ['executing', 'waiting_approval', 'waiting_input', 'compacting', 'cancelling', 'finished'],
+  executing: ['generating', 'waiting_approval', 'waiting_input', 'compacting', 'cancelling', 'finished'],
+  waiting_input: ['generating', 'executing', 'waiting_approval', 'cancelling', 'finished'],
+  waiting_approval: ['generating', 'executing', 'waiting_input', 'cancelling', 'finished'],
   compacting: ['generating', 'executing', 'cancelling', 'finished'],
   cancelling: ['finished'],
   finished: [], // Terminal phase

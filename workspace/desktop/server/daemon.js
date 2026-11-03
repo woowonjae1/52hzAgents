@@ -97,6 +97,17 @@ if (ipcPort) {
           onDelete: async (key) => {
             return sendIpcRequest('VAULT_DELETE', { id: key });
           },
+          onReload: async () => {
+            return sendIpcRequest('VAULT_RELOAD', {});
+          },
+          encryptString: async (plainText) => {
+            const cipherBase64 = await sendIpcRequest('SAFE_STORAGE_ENCRYPT', { plainText });
+            return Buffer.from(cipherBase64, 'base64');
+          },
+          decryptString: async (cipher) => {
+            const cipherBase64 = Buffer.isBuffer(cipher) ? cipher.toString('base64') : String(cipher);
+            return sendIpcRequest('SAFE_STORAGE_DECRYPT', { cipherBase64 });
+          },
         };
 
         const { server, port: actualPort } = await startServer({
