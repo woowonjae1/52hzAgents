@@ -217,7 +217,7 @@ interface WorkspaceContextValue {
   consumeSkipFocus: () => boolean;
   setSelectedFileId: (id: string | null) => void;
   setCurrentFilePath: (path: string) => void;
-  createSession: (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string; orchestrationMode?: string }) => Promise<WorkspaceSession>;
+  createSession: (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string; orchestrationMode?: string; agentId?: string }) => Promise<WorkspaceSession>;
   /** The open, not-yet-sent new chat, if any. Never in `sessions`. See isDraftSessionId. */
   draftSession: WorkspaceSession | null;
   /** Create the draft on the server (first send) and return the real session id. */
@@ -1981,7 +1981,7 @@ export function WorkspaceProvider({
   }, [workspaceId, refreshDiscovery, refreshRoutines, refreshTodos, refreshTimers, refreshNotifications]);
 
 
-  const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string; orchestrationMode?: string }) => {
+  const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string; orchestrationMode?: string; agentId?: string }) => {
     // A draft, not a channel: nothing reaches the server until the first
     // message is sent (see DRAFT_SESSION_PREFIX). Opening a second new chat
     // simply replaces an unsent one.
@@ -2004,6 +2004,11 @@ export function WorkspaceProvider({
       lastEventAt: null,
       workingDir: opts?.workingDir ?? null,
     };
+    if (opts?.agentId) {
+      try {
+        localStorage.setItem(`52hz_runtime_${draft.sessionId}`, JSON.stringify({ agentId: opts.agentId, inheritAgent: true }));
+      } catch {}
+    }
     draftCreateOptsRef.current = { resumeFrom: opts?.resumeFrom };
     setDraftSession(draft);
     setCurrentSessionId(draft.sessionId);
@@ -2019,14 +2024,29 @@ export function WorkspaceProvider({
       return Promise.reject(new Error('This new chat is no longer open'));
     }
     const promise = (async () => {
-      let runtimeConfig: Record<string, unknown> | undefined;
-      try { runtimeConfig = JSON.parse(localStorage.getItem(`52hz_runtime_${draftId}`) || 'null') || undefined; } catch {}
+      let rawDraft: Record<string, unknown> | undefined;
+      try { rawDraft = JSON.parse(localStorage.getItem(`52hz_runtime_${draftId}`) || 'null') || undefined; } catch {}
+      const draftAgentId = (rawDraft?.agentId as string) || undefined;
+      let cleanRuntimeConfig: Record<string, unknown> | undefined = undefined;
+      if (rawDraft) {
+        const { agentId: _discard, ...rest } = rawDraft;
+        if (rest.inheritAgent === true) {
+          cleanRuntimeConfig = {
+            inheritAgent: true,
+            ...(rest.mode ? { mode: rest.mode } : {}),
+            ...(rest.autoCompact !== undefined ? { autoCompact: rest.autoCompact } : {}),
+          };
+        } else {
+          cleanRuntimeConfig = Object.keys(rest).length > 0 ? rest : undefined;
+        }
+      }
       let session = await workspaceApi.createChannel({
         title: draft.title || undefined,
         master: draft.master || undefined,
         participants: draft.participants,
         resumeFrom: draftCreateOptsRef.current.resumeFrom,
-        runtimeConfig,
+        runtimeConfig: cleanRuntimeConfig,
+        agentId: draftAgentId,
       });
 
       // The folder binding and a non-default mode ride a separate PATCH --

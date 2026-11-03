@@ -234,6 +234,56 @@ class PipelinesRepository {
       updated_at: row.updated_at,
     };
   }
+
+  listSavedWorkflows(workspaceId) {
+    const rows = this.db.prepare('SELECT * FROM saved_workflows WHERE workspace_id = ? ORDER BY name ASC').all(workspaceId);
+    return rows.map(r => ({
+      id: r.id,
+      workspace_id: r.workspace_id,
+      name: r.name,
+      description: r.description || '',
+      steps: r.steps_json ? JSON.parse(r.steps_json) : [],
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    }));
+  }
+
+  getSavedWorkflow(workspaceId, id) {
+    const r = this.db.prepare('SELECT * FROM saved_workflows WHERE workspace_id = ? AND id = ?').get(workspaceId, id);
+    if (!r) return null;
+    return {
+      id: r.id,
+      workspace_id: r.workspace_id,
+      name: r.name,
+      description: r.description || '',
+      steps: r.steps_json ? JSON.parse(r.steps_json) : [],
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    };
+  }
+
+  saveWorkflow(workspaceId, { id, name, description = '', steps = [] }) {
+    const now = new Date().toISOString();
+    const wfId = id || crypto.randomUUID();
+    const stepsJson = JSON.stringify(steps);
+    const existing = this.db.prepare('SELECT id FROM saved_workflows WHERE workspace_id = ? AND (id = ? OR name = ?)').get(workspaceId, wfId, name);
+    if (existing) {
+      this.db.prepare(`
+        UPDATE saved_workflows SET name = ?, description = ?, steps_json = ?, updated_at = ?
+        WHERE workspace_id = ? AND id = ?
+      `).run(name, description, stepsJson, now, workspaceId, existing.id);
+      return this.getSavedWorkflow(workspaceId, existing.id);
+    }
+    this.db.prepare(`
+      INSERT INTO saved_workflows (id, workspace_id, name, description, steps_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(wfId, workspaceId, name, description, stepsJson, now, now);
+    return this.getSavedWorkflow(workspaceId, wfId);
+  }
+
+  deleteSavedWorkflow(workspaceId, id) {
+    this.db.prepare('DELETE FROM saved_workflows WHERE workspace_id = ? AND id = ?').run(workspaceId, id);
+  }
 }
 
 module.exports = { PipelinesRepository };

@@ -142,7 +142,7 @@ export function ProjectHome() {
                     className="inline-flex items-center gap-2 text-xs text-foreground-muted hover:text-foreground"
                   >
                     <Bot className="size-3.5" />
-                    配置模型连接
+                    管理 Agent 与协作成员
                     <ArrowRight className="size-3" />
                   </button>
                   <button

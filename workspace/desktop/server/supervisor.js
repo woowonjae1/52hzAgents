@@ -281,17 +281,51 @@ class BackendSupervisor extends EventEmitter {
       try {
         if (message.action === 'VAULT_SET') {
           this.saveEncryptedCredential(message.payload.id, message.payload.secret);
-          this.child.postMessage({ type: 'RES', id: message.id, success: true });
+          this._postToChild({ type: 'RES', id: message.id, success: true });
         } else if (message.action === 'VAULT_DELETE') {
           this.deleteEncryptedCredential(message.payload.id);
-          this.child.postMessage({ type: 'RES', id: message.id, success: true });
+          this._postToChild({ type: 'RES', id: message.id, success: true });
+        } else if (message.action === 'VAULT_RELOAD') {
+          const freshCache = this.loadCredentialsCache();
+          this._postToChild({ type: 'RES', id: message.id, success: true, result: freshCache });
+        } else if (message.action === 'SAFE_STORAGE_ENCRYPT') {
+          if (!this.safeStorage || typeof this.safeStorage.encryptString !== 'function') {
+            throw new Error('System credential encryption (safeStorage) is unavailable.');
+          }
+          if (typeof this.safeStorage.isEncryptionAvailable === 'function' && !this.safeStorage.isEncryptionAvailable()) {
+            throw new Error('System credential encryption is not available on this platform.');
+          }
+          const plainText = message.payload?.plainText ?? '';
+          const cipherBuf = this.safeStorage.encryptString(plainText);
+          const cipherBase64 = Buffer.isBuffer(cipherBuf) ? cipherBuf.toString('base64') : Buffer.from(cipherBuf).toString('base64');
+          this._postToChild({ type: 'RES', id: message.id, success: true, result: cipherBase64 });
+        } else if (message.action === 'SAFE_STORAGE_DECRYPT') {
+          if (!this.safeStorage || typeof this.safeStorage.decryptString !== 'function') {
+            throw new Error('System credential encryption (safeStorage) is unavailable.');
+          }
+          if (typeof this.safeStorage.isEncryptionAvailable === 'function' && !this.safeStorage.isEncryptionAvailable()) {
+            throw new Error('System credential encryption is not available on this platform.');
+          }
+          const cipherBase64 = message.payload?.cipherBase64 ?? '';
+          const cipherBuf = Buffer.from(cipherBase64, 'base64');
+          const decrypted = this.safeStorage.decryptString(cipherBuf);
+          this._postToChild({ type: 'RES', id: message.id, success: true, result: decrypted });
         } else {
-          this.child.postMessage({ type: 'RES', id: message.id, success: false, error: `Unknown daemon action '${message.action}'` });
+          this._postToChild({ type: 'RES', id: message.id, success: false, error: `Unknown daemon action '${message.action}'` });
         }
       } catch (err) {
-        this.child.postMessage({ type: 'RES', id: message.id, success: false, error: err.message });
+        this._postToChild({ type: 'RES', id: message.id, success: false, error: err.message });
       }
       return;
+    }
+  }
+
+  _postToChild(msg) {
+    if (!this.child) return;
+    if (typeof this.child.postMessage === 'function') {
+      this.child.postMessage(msg);
+    } else if (typeof this.child.send === 'function') {
+      this.child.send(msg);
     }
   }
 

@@ -57,6 +57,10 @@ class RuntimeTools {
       }
     }
     if (!row) return;
+    if (value.patch !== undefined) {
+      row.patch = String(value.patch).slice(0, 128 * 1024); row.patch_truncated = String(value.patch).length > 128 * 1024;
+      row.path = value.path;
+    }
     if (value.output !== undefined) { row.output = tail(value.output); row.output_truncated = value.output.length > 64 * 1024; }
     if (value.phase === 'end') {
       row.status = run.controller.signal.aborted ? 'cancelled' : ['denied','expired'].includes(row.status) ? row.status : value.isError ? 'failed' : 'completed';

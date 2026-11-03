@@ -23,7 +23,7 @@ class Collaboration {
     if (typeof reference !== 'string' || !reference) throw fail('Choose a saved Agent ID for each task.', 400);
     const profile = this.repository.getProfile(reference);
     const agent = this.store.storage.agentDefinitions.requireActive(profile ? profile.agent : reference);
-    if (!agent.modelResource) throw fail(`Configure a model resource for Agent ${agent.name} before collaboration.`, 400);
+    if (agent.runtimeKind === 'pi' && !agent.modelResource) throw fail(`Configure a model resource for Agent ${agent.name} before collaboration.`, 400);
     this.runner.validateDefinitionResource(agent);
     const result = structuredClone(agent);
     if (profile) {
@@ -32,7 +32,7 @@ class Collaboration {
       // Profiles may narrow tools/budgets, but never create another Agent identity.
       result.profileTools = profile.allowed_tools?.length ? profile.allowed_tools : null;
       result.profileId = profile.id;
-      if (profile.model && profile.model !== result.modelResource.modelId) throw fail('Update the Agent model resource instead of overriding it through a legacy profile.', 400);
+      if (profile.model && profile.model !== result.modelResource?.modelId) throw fail('Update the Agent model resource instead of overriding it through a legacy profile.', 400);
       for (const [key, value] of [['maxTokensPerRun', profile.budget_tokens], ['maxCostPerRun', profile.budget_cost_micros / 1e6]]) {
         if (value > 0) result.limits[key] = Math.min(result.limits[key] || Infinity, value);
       }
@@ -42,7 +42,7 @@ class Collaboration {
     return result;
   }
   actorConfig(agent) {
-    return this.runner.validateConfig({ provider: agent.modelResource.connectionId, model: agent.modelResource.modelId, mode: agent.defaultMode, autoCompact: true });
+    return this.runner.validateConfig({ provider: agent.modelResource?.connectionId, model: agent.modelResource?.modelId, mode: agent.defaultMode, autoCompact: true }, agent);
   }
   git(root, args) { return this.repository._execGitSync(root, ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', ...args]); }
   assertIdle(root) {
@@ -93,6 +93,7 @@ class Collaboration {
     return view;
   }
   start(channel, input = {}, parentRun = null) {
+    if ((this.runner.isRecoveryBlocked?.() || this.runner.isRecoveryLocked?.())) throw fail('System recovery is in progress; collaboration cannot be started.', 409);
     if (!this.store.getChannel(channel)) throw fail('Session not found.', 404);
     if (parentRun?.snapshot.collaboration) throw fail('Nested collaboration is disabled.');
     const workers = input.workers || [];
@@ -103,10 +104,12 @@ class Collaboration {
       if (worker.scope !== undefined && (typeof worker.scope !== 'string' || worker.scope.length > 500)) throw fail('Invalid worker scope.', 400);
       const actor = this.actor(worker.agent_id || worker.profile || worker.agent || worker.assignee);
       const config = this.actorConfig(actor);
+      this.runner.validateNativeExecution?.(actor, config, { channel, execution: { kind: 'lane' } });
       return { actor, config, task: worker.task, alias: `worker-${index + 1}`, scope: worker.scope || '' };
     });
     const reviewReference = input.review_agent !== undefined ? input.review_agent : this.store.getChannel(channel).review_agent;
     const reviewer = reviewReference ? this.actor(reviewReference) : null;
+    if (reviewer) this.runner.validateNativeExecution?.(reviewer, this.actorConfig(reviewer), { channel, execution: { kind: 'review' } });
     const project = this.store.getChannel(channel).working_dir;
     if (!project || !fs.existsSync(project)) throw fail('Choose a Git project before starting collaboration.', 400);
     const repo = this.git(project, ['rev-parse', '--show-toplevel']).trim();
@@ -401,12 +404,15 @@ class Collaboration {
     }
   }
   startPipeline(channel, input) {
+    if ((this.runner.isRecoveryBlocked?.() || this.runner.isRecoveryLocked?.())) throw fail('System recovery is in progress; pipelines cannot be started.', 409);
     if (!this.store.getChannel(channel)) throw fail('Session not found.', 404);
     if (!Array.isArray(input.steps) || input.steps.length < 1 || input.steps.length > 12) throw fail('Choose 1–12 pipeline steps.', 400);
     if (this.store.storage.pipelines.get(channel).active || [...this.runner.active.values()].some(run => run.snapshot.channel === channel)) throw fail('Stop existing session tasks before starting a pipeline.');
     const actors = input.steps.map(step => {
       if (typeof step.instruction !== 'string' || !step.instruction.trim() || step.instruction.length > 16000) throw fail('Every pipeline step needs an instruction.', 400);
-      return this.actor(step.agent_id || step.agent);
+      const actor = this.actor(step.agent_id || step.agent);
+      this.runner.validateNativeExecution?.(actor, this.actorConfig(actor), { channel, execution: { kind: 'pipeline' } });
+      return actor;
     });
     const saved = this.store.storage.pipelines.save(channel, input);
     saved.steps.forEach((step, index) => { step.agent = actors[index].id; step.agent_id = actors[index].id; step.actor_snapshot = actors[index]; });

@@ -36,6 +36,45 @@ class CredentialVault {
     return {};
   }
 
+  invalidate() {
+    this.cache = {};
+    this.data = {};
+    this.unavailable = true;
+  }
+
+  async reload() {
+    // Never expose a previous secret while restoring or after a failed IPC request.
+    this.invalidate();
+    try {
+      const data = fs.existsSync(this.filePath) ? JSON.parse(fs.readFileSync(this.filePath, 'utf8')) : {};
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid credential file.');
+      let cache = {};
+      if (this.safeStorage?.isBridge) {
+        if (typeof this.safeStorage.onReload !== 'function') throw new Error('Credential reload bridge is unavailable.');
+        const freshCache = await this.safeStorage.onReload();
+        if (!freshCache || typeof freshCache !== 'object' || Array.isArray(freshCache)) throw new Error('Invalid credential reload response.');
+        cache = { ...freshCache };
+      } else {
+        for (const [id, cipher] of Object.entries(data)) {
+          if (typeof cipher === 'string') {
+            const value = this.decrypt(cipher);
+            if (value) cache[id] = value;
+          }
+        }
+      }
+      for (const [id, cipher] of Object.entries(data)) {
+        if (cipher && (typeof cache[id] !== 'string' || !cache[id])) throw new Error('A restored credential could not be decrypted.');
+      }
+      this.data = data;
+      this.cache = cache;
+      this.unavailable = false;
+      return this.data;
+    } catch (error) {
+      this.invalidate();
+      throw new Error(`Failed to reload decrypted credentials${this.safeStorage?.isBridge ? ' via bridge' : ''}: ${error.message}`);
+    }
+  }
+
   save() {
     try {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
@@ -80,11 +119,13 @@ class CredentialVault {
   }
 
   has(id) {
+    if (this.unavailable) return false;
     if (this.cache[id]) return true;
     return Boolean(this.get(id));
   }
 
   get(id) {
+    if (this.unavailable) return null;
     if (this.cache[id]) return this.cache[id];
     if (!this.data[id]) return null;
     const value = this.decrypt(this.data[id]);
@@ -99,6 +140,7 @@ class CredentialVault {
   }
 
   set(id, secret) {
+    if (this.unavailable) throw Object.assign(new Error('Credential recovery is incomplete. Retry system recovery first.'), { status: 503 });
     const previousData = { ...this.data };
     const previousCache = this.cache[id];
     if (!secret) {
@@ -152,6 +194,7 @@ class CredentialVault {
   }
 
   delete(id) {
+    if (this.unavailable) throw Object.assign(new Error('Credential recovery is incomplete. Retry system recovery first.'), { status: 503 });
     const previousCache = this.cache[id];
     const previousData = { ...this.data };
     if (this.safeStorage?.isBridge) {

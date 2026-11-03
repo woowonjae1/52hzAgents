@@ -16,6 +16,7 @@ export class EventsApi extends BaseWorkspaceApi {
     participants?: string[];
     resumeFrom?: string;
     runtimeConfig?: Record<string, unknown>;
+    agentId?: string;
   } = {}): Promise<WorkspaceSession> {
     const event = await this.sendEvent({
       type: 'network.channel.create',
@@ -27,6 +28,7 @@ export class EventsApi extends BaseWorkspaceApi {
         ...(opts.participants && { participants: opts.participants }),
         ...(opts.resumeFrom && { resume_from: opts.resumeFrom }),
         ...(opts.runtimeConfig && { runtime_config: opts.runtimeConfig }),
+        ...(opts.agentId && { agent_id: opts.agentId }),
       },
     });
 

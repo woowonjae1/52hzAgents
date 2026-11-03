@@ -20,7 +20,6 @@ import {
 import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { useSessionGridOptional } from '@/lib/session-grid-context';
-import { useTheme } from 'next-themes';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ThemeToggle } from '@/components/motion/theme-toggle';
 import { browseForFolder, recentWorkingDirs, rememberWorkingDir } from '@/components/chat/project-folder-picker';
@@ -95,7 +94,6 @@ export function DesktopAppBar() {
   } = useLayout();
 
   const grid = useSessionGridOptional();
-  const { resolvedTheme, setTheme } = useTheme();
 
   // Find the active session to see which project is currently active
   const activeSession = useMemo(
@@ -511,8 +509,6 @@ export function DesktopAppBar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <ThemeToggle
-              variant="circle"
-              start="bottom-left"
               className="size-8 rounded-lg flex items-center justify-center hover:bg-surface2 text-foreground-muted hover:text-foreground transition-colors cursor-pointer active:scale-95"
               iconClassName="size-4"
             />

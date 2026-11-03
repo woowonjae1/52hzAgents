@@ -117,6 +117,14 @@ class ConfigManager {
     return [];
   }
 
+  async reload() {
+    this.userConnections = this.loadUserConnections();
+    if (typeof this.vault?.reload === 'function') {
+      await this.vault.reload();
+    }
+    return this.userConnections;
+  }
+
   saveUserConnections() {
     try {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });

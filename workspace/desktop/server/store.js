@@ -77,6 +77,41 @@ class Store {
     return this.getDefaultData();
   }
 
+  reload() {
+    this.data = this.load();
+    this.committed = JSON.stringify(this.data);
+    if (this.storage?.sessions) {
+      try {
+        const sqliteSessions = this.storage.sessions.list();
+        if (sqliteSessions && sqliteSessions.length > 0) {
+          if (!this.data.workspace) this.data.workspace = {};
+          if (!Array.isArray(this.data.workspace.channels)) this.data.workspace.channels = [];
+          const channelMap = new Map(this.data.workspace.channels.map(c => [c.name, c]));
+          for (const s of sqliteSessions) {
+            const ch = channelMap.get(s.id);
+            if (ch) {
+              ch.agent_id = s.agentId;
+              ch.runtime_config = s.runtimeConfig;
+              ch.working_dir = s.workingDir;
+              ch.status = s.status || 'active';
+            } else {
+              this.data.workspace.channels.push({
+                name: s.id,
+                title: s.title || s.id,
+                agent_id: s.agentId,
+                runtime_config: s.runtimeConfig,
+                working_dir: s.workingDir,
+                orchestration_mode: s.mode || 'chat',
+                status: s.status || 'active',
+              });
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return this.data;
+  }
+
   save() {
     const temp = `${this.dbFile}.${crypto.randomUUID()}.tmp`;
     try {

@@ -134,6 +134,20 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     return this.request<ParallelBatch>(`/v1/parallel-batch?${params}`);
   }
 
+  /** Start a new parallel collaboration batch with assigned Agents. */
+  async startParallelBatch(input: {
+    channel_name: string;
+    workers: Array<{ agent_id: string; task: string; scope?: string }>;
+    review_agent?: string;
+    total_budget_tokens?: number;
+    isolation?: string;
+  }): Promise<ParallelRun> {
+    return this.request<ParallelRun>('/v1/parallel-batch/start', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
   /** Run a failed lane again, on its own worktree. */
   async retryParallelLane(batchId: string, agent: string): Promise<void> {
     await this.request(

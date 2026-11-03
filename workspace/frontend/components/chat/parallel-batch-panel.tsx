@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff, ShieldCheck, Clock, SkipForward, Undo2, MessagesSquare, Ban, FolderMinus, Check, X, FileText } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff, ShieldCheck, Clock, SkipForward, Undo2, MessagesSquare, Ban, FolderMinus, Check, X, FileText, Plus, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
 import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane, LaneReviewStatus, DeliveryDiffResult } from '@/lib/api/orchestration';
@@ -36,6 +36,7 @@ const POLL_MS = 4000;
 export function ParallelBatchPanel({ channelName, active, className, onReviewStateChange }: Props) {
   const [batch, setBatch] = React.useState<ParallelBatch | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [createOpen, setCreateOpen] = React.useState(false);
 
   const isReviewing = Boolean(batch?.run?.batch.status === 'review');
   React.useEffect(() => {
@@ -119,6 +120,24 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
         {batch.isolated && (
           <ReviewSetting channelName={channelName} value={batch.review_agent} onSaved={reload} className="mt-2" />
         )}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 shadow-xs"
+          >
+            <Plus className="size-3.5" />
+            <span>分配协作任务并启动批次</span>
+          </button>
+        </div>
+        {createOpen && (
+          <CreateParallelBatchModal
+            channelName={channelName}
+            isIsolated={Boolean(batch.isolated)}
+            onClose={() => setCreateOpen(false)}
+            onCreated={reload}
+          />
+        )}
       </div>
     );
   }
@@ -133,6 +152,7 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
       <RunView
         run={run}
         onRetried={reload}
+        onNewBatch={() => setCreateOpen(true)}
         setting={
           batch.isolated ? <ReviewSetting channelName={channelName} value={batch.review_agent} onSaved={reload} /> : null
         }
@@ -184,6 +204,14 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
       {error && <p className="mt-2 text-2xs text-muted-foreground">Last refresh failed: {error}</p>}
     </div>
     )}
+      {createOpen && (
+        <CreateParallelBatchModal
+          channelName={channelName}
+          isIsolated={Boolean(batch?.isolated)}
+          onClose={() => setCreateOpen(false)}
+          onCreated={reload}
+        />
+      )}
     </div>
   );
 }
@@ -202,7 +230,7 @@ const LANE_STATUS: Record<ParallelLane['status'], { label: string; icon: React.E
  * The batch that actually ran: one row per agent with what became of its work.
  * A failed lane can be run again on its own worktree without touching the rest.
  */
-function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () => void; setting?: React.ReactNode }) {
+function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; onRetried: () => void; onNewBatch?: () => void; setting?: React.ReactNode }) {
   const [retrying, setRetrying] = React.useState<string | null>(null);
   const [deciding, setDeciding] = React.useState<'merge' | 'discard' | null>(null);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
@@ -409,8 +437,8 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
                     Retry this part
                   </button>
                 )}
-                {lane.review_status && (
-                  <LaneReview lane={lane} actionable={reviewing && lane.status === 'done'} batchId={run.batch.id} onChanged={onRetried} />
+                {(lane.review_status || lane.status === 'done') && (
+                  <LaneReview lane={lane} actionable={lane.status === 'done'} batchId={run.batch.id} onChanged={onRetried} />
                 )}
               </div>
             </li>
@@ -419,6 +447,16 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
       </ul>
       {(reviewing || run.batch.status === 'blocked' || run.batch.status === 'cancelled' || run.batch.status === 'done') && (
         <footer className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-2.5">
+          {onNewBatch && (run.batch.status === 'done' || run.batch.status === 'cancelled') && (
+            <button
+              type="button"
+              onClick={onNewBatch}
+              className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-2xs text-primary hover:bg-primary/20 font-medium"
+            >
+              <Plus className="size-3" />
+              <span>新建协作批次</span>
+            </button>
+          )}
           {(run.batch.status === 'done' || run.batch.status === 'cancelled') && (
             <button
               type="button"
@@ -517,8 +555,12 @@ function LaneReview({
       setBusy(null);
     }
   };
-  if (!status) return null;
-  const st = REVIEW_STATUS[status];
+  if (!status && lane.status !== 'done') return null;
+  const st = (status && REVIEW_STATUS[status]) ? REVIEW_STATUS[status] : {
+    label: () => '待审阅 (Awaiting Review)',
+    icon: Clock,
+    className: 'text-foreground-muted',
+  };
   const Icon = st.icon;
   const notes = lane.review_notes.trim();
   const canSendBack = actionable && status !== 'running' && notes !== '';
@@ -595,9 +637,9 @@ function LaneReview({
           </div>
         </div>
       )}
-      {(canSendBack || canRetry || lane.review_channel) && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {actionable && lane.status === 'done' && (
+      {(actionable || canSendBack || canRetry || lane.review_channel) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {actionable && (
             <button
               type="button"
               disabled={busy !== null}
@@ -943,6 +985,261 @@ function Lane({ worker, blocked }: { worker: ParallelWorker; blocked: boolean })
             style={{ width: `${percent}%` }}
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface CreateBatchProps {
+  channelName: string;
+  isIsolated: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated }: CreateBatchProps) {
+  const [agents, setAgents] = React.useState<AgentDefinition[]>([]);
+  const [loadingAgents, setLoadingAgents] = React.useState(true);
+  const [workers, setWorkers] = React.useState<Array<{ agent_id: string; task: string; scope: string }>>([
+    { agent_id: '', task: '', scope: '' },
+    { agent_id: '', task: '', scope: '' },
+  ]);
+  const [reviewerId, setReviewerId] = React.useState<string>('');
+  const [budgetTokens, setBudgetTokens] = React.useState<string>('128000');
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    workspaceApi.listAgentDefinitions(false)
+      .then((res) => {
+        if (cancelled) return;
+        const active = (res.agents || []).filter((a) => a.status !== 'disabled');
+        setAgents(active);
+        if (active.length > 0) {
+          setWorkers([
+            { agent_id: active[0].id, task: '', scope: '' },
+            { agent_id: (active[1] || active[0]).id, task: '', scope: '' },
+          ]);
+        }
+      })
+      .catch(() => toast.error('无法加载 Agent 列表'))
+      .finally(() => { if (!cancelled) setLoadingAgents(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleAddWorker = () => {
+    if (agents.length === 0) return;
+    setWorkers((prev) => [...prev, { agent_id: agents[0]?.id || '', task: '', scope: '' }]);
+  };
+
+  const handleRemoveWorker = (index: number) => {
+    if (workers.length <= 1) return;
+    setWorkers((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleWorkerChange = (index: number, patch: Partial<{ agent_id: string; task: string; scope: string }>) => {
+    setWorkers((prev) => prev.map((w, i) => (i === index ? { ...w, ...patch } : w)));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isIsolated) {
+      toast.error('当前项目非 Git 仓库根目录，无法启动工作区隔离协作');
+      return;
+    }
+    const emptyTaskIndex = workers.findIndex((w) => !w.task.trim());
+    if (emptyTaskIndex !== -1) {
+      toast.error(`子任务 #${emptyTaskIndex + 1} 尚未填写任务内容`);
+      return;
+    }
+    const emptyAgentIndex = workers.findIndex((w) => !w.agent_id);
+    if (emptyAgentIndex !== -1) {
+      toast.error(`子任务 #${emptyAgentIndex + 1} 尚未选择执行 Agent`);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await workspaceApi.startParallelBatch({
+        channel_name: channelName,
+        workers: workers.map((w) => ({
+          agent_id: w.agent_id,
+          task: w.task.trim(),
+          scope: w.scope.trim() || undefined,
+        })),
+        review_agent: reviewerId || undefined,
+        total_budget_tokens: parseInt(budgetTokens, 10) || 128000,
+        isolation: 'worktree',
+      });
+      toast.success('已启动多 Agent 协作批次');
+      onCreated();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '启动协作批次失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div className="flex flex-col w-full max-w-2xl max-h-[90vh] rounded-2xl border border-border bg-surface-raised shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface0">
+          <div className="flex items-center gap-2">
+            <Bot className="size-4 text-primary shrink-0" />
+            <h3 className="text-sm font-semibold text-foreground">发起多 Agent 协作批次 (分配任务)</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Content Form */}
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs font-sans">
+          {!isIsolated && (
+            <div className="p-3 rounded-lg border border-status-warning/40 bg-status-warning/10 text-status-warning flex items-start gap-2">
+              <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                当前项目未设置 Git 仓库或非仓库根目录。并行协作需要独立的 Git Worktree 隔离工作区。请先在工作区设置中选择有效的 Git 项目根目录。
+              </p>
+            </div>
+          )}
+
+          {/* Workers list */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <span>并行子任务与执行 Agent 分配</span>
+                <span className="text-3xs text-muted-foreground font-normal">（每个任务将运行于独立的 Git Worktree）</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleAddWorker}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-2xs bg-surface2 hover:bg-surface3 border border-border text-foreground transition-colors"
+              >
+                <Plus className="size-3" />
+                <span>添加子任务</span>
+              </button>
+            </div>
+
+            {loadingAgents ? (
+              <div className="py-6 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="size-4 animate-spin text-primary" />
+                <span>加载 Agent 列表中...</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {workers.map((worker, index) => (
+                  <div key={index} className="p-3 rounded-xl border border-border/80 bg-surface0/70 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="font-mono text-2xs font-bold text-muted-foreground w-6">#{index + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <select
+                            value={worker.agent_id}
+                            onChange={(e) => handleWorkerChange(index, { agent_id: e.target.value })}
+                            className="w-full h-8 rounded-lg border border-border bg-surface1 px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            {agents.map((ag) => (
+                              <option key={ag.id} value={ag.id}>
+                                {ag.name} ({ag.role})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {workers.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWorker(index)}
+                          className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          title="移除此子任务"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div>
+                      <textarea
+                        value={worker.task}
+                        onChange={(e) => handleWorkerChange(index, { task: e.target.value })}
+                        placeholder={`填写子任务 #${index + 1} 的具体实施目标与要求...`}
+                        rows={2}
+                        className="w-full rounded-lg border border-border bg-surface1 p-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-3xs text-muted-foreground shrink-0">文件范围 (可选):</span>
+                      <input
+                        type="text"
+                        value={worker.scope}
+                        onChange={(e) => handleWorkerChange(index, { scope: e.target.value })}
+                        placeholder="例如：src/components/**, api/v1/*"
+                        className="flex-1 h-7 rounded-md border border-border bg-surface1 px-2 text-3xs text-foreground font-mono"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Reviewer & Budget */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
+            <div className="space-y-1">
+              <label className="text-2xs font-medium text-foreground">自动审阅 Agent (可选)</label>
+              <select
+                value={reviewerId}
+                onChange={(e) => setReviewerId(e.target.value)}
+                className="w-full h-8 rounded-lg border border-border bg-surface0 px-2 text-xs text-foreground"
+              >
+                <option value="">不指定（交付后由人工审阅）</option>
+                {agents.map((ag) => (
+                  <option key={ag.id} value={ag.id}>
+                    {ag.name} ({ag.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-2xs font-medium text-foreground">批次 Token 预算上限</label>
+              <input
+                type="number"
+                value={budgetTokens}
+                onChange={(e) => setBudgetTokens(e.target.value)}
+                min={1000}
+                max={1000000}
+                step={10000}
+                className="w-full h-8 rounded-lg border border-border bg-surface0 px-2 text-xs font-mono text-foreground"
+              />
+            </div>
+          </div>
+
+          {/* Footer buttons */}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/60">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !isIsolated || loadingAgents}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-xs"
+            >
+              {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <GitMerge className="size-3.5" />}
+              <span>启动协作批次</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

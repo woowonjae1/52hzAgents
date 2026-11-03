@@ -33,7 +33,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Hint } from '@/components/ui/hint';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { useTheme } from 'next-themes';
 import { isToday, isYesterday, subDays, isAfter } from 'date-fns';
 import type { WorkspaceSession } from '@/lib/types';
 
@@ -140,8 +139,6 @@ export function WorkbenchSidebarContent() {
   const gitAdditions = gitStatus?.additions;
   const gitDeletions = gitStatus?.deletions;
 
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
@@ -155,11 +152,9 @@ export function WorkbenchSidebarContent() {
   const onlineAgentsCount = useMemo(() => agents.filter((a) => a.status === 'online').length, [agents]);
 
   React.useEffect(() => {
-    setMounted(true);
     setPinnedIds(loadPinnedSessionIds());
   }, []);
 
-  const isDark = mounted && resolvedTheme === 'dark';
 
   const togglePinSession = useCallback((sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -728,13 +723,11 @@ export function WorkbenchSidebarContent() {
           <Tooltip>
             <TooltipTrigger asChild>
               <ThemeToggle
-                variant="circle"
-                start="bottom-right"
                 className="size-7 rounded-lg text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
                 iconClassName="size-3.5"
               />
             </TooltipTrigger>
-            <TooltipContent side="top">{isDark ? 'Light mode' : 'Dark mode'}</TooltipContent>
+            <TooltipContent side="top">切换明暗主题</TooltipContent>
           </Tooltip>
         </div>
       </div>

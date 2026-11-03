@@ -9,7 +9,7 @@ import { toast } from '@/lib/toast';
 
 interface Checkpoint { id: string; scope?: string; files: string[]; restored_at: number | null; partial?: boolean; pending_command?: boolean; root_matches?: boolean; coverage?: string; worktree?: boolean; restore_error?: string }
 interface RecoveryRun { id: string; channel: string; outcome: string | null; checkpoint: Checkpoint | null; started_at: number; error?: { code: string; message: string }; evidence?: { files_modified?: string[]; commands?: { command: string; exitCode?: number }[] } }
-interface Recovery { storage: { recovered: boolean } | null; runs: RecoveryRun[] }
+interface Recovery { storage: { recovered: boolean } | null; systemRecovery?: { code: string; message: string } | null; runs: RecoveryRun[] }
 const labels: Record<string, string> = { interrupted: '应用退出导致任务中断', cancelled: '任务已停止', timed_out: '任务超时', failed: '任务失败', denied: '命令已拒绝', expired: '命令审批已过期', limited: '达到执行上限', finished: '运行已结束' };
 
 export function RunRecoveryPanel({ channel, running }: { channel: string | null; running: boolean }) {
@@ -30,7 +30,7 @@ export function RunRecoveryPanel({ channel, running }: { channel: string | null;
   React.useEffect(() => { void refresh(); }, [running, refresh]);
   React.useEffect(() => { const changed = () => { void refresh(); }; window.addEventListener('52hz:project-files-changed', changed); return () => window.removeEventListener('52hz:project-files-changed', changed); }, [refresh]);
   const runs = state?.runs.filter(run => run.outcome && (run.checkpoint || ['interrupted', 'cancelled', 'failed', 'timed_out', 'denied', 'expired', 'limited'].includes(run.outcome))).slice(-5).reverse() || [];
-  if (!runs.length && !state?.storage?.recovered) return null;
+  if (!runs.length && !state?.storage?.recovered && !state?.systemRecovery) return null;
   const restore = async () => {
     if (!target || busy) return;
     setBusy(true);
@@ -42,6 +42,7 @@ export function RunRecoveryPanel({ channel, running }: { channel: string | null;
     finally { setBusy(false); setTarget(null); }
   };
   return <div className="mt-2 rounded-lg border border-border bg-surface1 px-3 py-2 text-xs" data-testid="run-recovery">
+    {state?.systemRecovery && <p role="alert" className="mb-2 leading-5 text-amber-500">{state.systemRecovery.message}<button type="button" onClick={() => openSettings('export')} className="ml-2 underline underline-offset-2">打开备份恢复</button></p>}
     {state?.storage?.recovered && <p role="status" className="mb-2 text-amber-500">工作区数据已从上次有效备份恢复，损坏原文件已保留。</p>}
     {!!runs.length && <details><summary className="cursor-pointer text-foreground-muted">{labels[runs[0].outcome || ''] || '任务记录'} · 修改恢复记录</summary>
       <p className="mt-2 leading-5 text-foreground-muted">中断后不会自动重放命令。可查看当前修改，再发送新消息继续；Agent 会重新检查项目，命令仍需审批。</p>

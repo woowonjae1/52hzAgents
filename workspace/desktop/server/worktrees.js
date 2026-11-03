@@ -50,7 +50,7 @@ class Worktrees {
         if (overlap(process.platform === 'win32' ? active.toLowerCase() : active,key)) throw fail('请先停止原项目与隔离目录中的全部任务。');
       }
     }
-    if (this.runner.workspaceOperations.has(channel)) throw fail('此会话正在进行工作区操作。');
+    if ((this.runner.isRecoveryBlocked?.() || this.runner.isRecoveryLocked?.()) || this.runner.workspaceOperations.has(channel)) throw fail('此会话正在进行工作区操作。');
     for (const key of keys) this.runner.restoring.add(key);
     this.runner.workspaceOperations.add(channel);
     try { return await operation(); } finally { this.runner.workspaceOperations.delete(channel);for (const key of keys) this.runner.restoring.delete(key); }

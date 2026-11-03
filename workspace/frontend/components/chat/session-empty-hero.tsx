@@ -88,7 +88,7 @@ export function SessionEmptyHero({
           type="button"
           onClick={onConnectAgent}
           className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] hover:bg-surface2 text-2xs font-medium text-muted-foreground hover:text-foreground shadow-xs transition-all cursor-pointer select-none active:scale-95"
-          title="配置模型连接"
+          title="管理 Agent 与协作成员"
         >
           <span
             className={cn(
@@ -97,7 +97,7 @@ export function SessionEmptyHero({
             )}
           />
           <span>
-            模型连接与会话模式
+            Agent 与协作成员
           </span>
           <span className="text-foreground-extra-muted">/</span>
           <span className="text-foreground-muted">设置</span>
