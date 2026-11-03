@@ -89,6 +89,7 @@ class AgentRunner {
     if (store.storage) {
       try {
         store.storage.runs.recoverInterrupted();
+        store.storage.nativeSessionBindings?.releaseAllActiveLocks();
       } catch (_) {}
     }
     store.save();

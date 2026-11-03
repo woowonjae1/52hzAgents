@@ -62,11 +62,34 @@ function defaultConfigDirFor(kind, env = process.env) {
 /**
  * Resolve a directory path safely, rejecting symlinks along existing segments.
  */
-function canonicalizeConfigDir(inputDir) {
+function canonicalizeConfigDir(inputDir, environment = 'local') {
   if (typeof inputDir !== 'string' || !inputDir.trim() || inputDir.includes('\0')) {
     throw fail('无效的配置目录路径。', 'INVALID_CONFIG_DIR', 400);
   }
-  const resolved = path.resolve(inputDir.trim());
+  const trimmed = inputDir.trim();
+
+  // Environment boundary validation (5.2 & R7)
+  if (environment === 'wsl') {
+    if (process.platform === 'win32') {
+      if (/^[a-zA-Z]:[\\/]/.test(trimmed)) {
+        throw fail('WSL 连接配置需指向 WSL 运行环境内的真实配置目录（如 \\\\wsl$\\Ubuntu\\home\\...），不能使用 Windows 本地盘符路径。', 'INVALID_CONFIG_DIR', 400);
+      }
+      if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+        throw fail('WSL 环境下的 POSIX 路径需包含发行版网络路径（如 \\\\wsl$\\<distro>\\... 或 \\\\wsl.localhost\\<distro>\\...），不能直接套入 Windows 驱动器路径。', 'INVALID_CONFIG_DIR', 400);
+      }
+    }
+  } else if (environment === 'local') {
+    if (process.platform === 'win32') {
+      if (/^\\\\[wW][sS][lL](\$|\.localhost)[\\/]/.test(trimmed) || /^\/\/[wW][sS][lL](\$|\.localhost)[\\/]/.test(trimmed)) {
+        throw fail('本地连接配置不能使用 WSL 网络路径，请将环境指定为 wsl。', 'INVALID_CONFIG_DIR', 400);
+      }
+      if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+        throw fail('Windows 本地环境配置目录需为合法的本地绝对盘符路径。', 'INVALID_CONFIG_DIR', 400);
+      }
+    }
+  }
+
+  const resolved = path.resolve(trimmed);
   const parts = [];
   let cur = resolved;
   while (true) {
@@ -1127,7 +1150,10 @@ class NativeConfigService {
     return [];
   }
 
-  resolveInstallationRef(kind, explicitPath = null) {
+  resolveInstallationRef(kind, explicitPath = null, environment = 'local') {
+    if (environment === 'wsl') {
+      return explicitPath ? String(explicitPath).trim() : `wsl:${kind}`;
+    }
     const probeKind = REVERSE_KIND_MAP[kind];
     const adapter = ADAPTERS.find(a => a.kind === probeKind);
     if (!adapter) throw fail(`未知客户端类型: ${kind}`, 'INVALID_CONNECTION_KIND', 400);
@@ -1155,9 +1181,10 @@ class NativeConfigService {
       throw fail(`不支持的 Agent 连接类型: ${kind}`, 'INVALID_CONNECTION_KIND', 400);
     }
 
-    const installationRef = this.resolveInstallationRef(kind, input.installationPath);
+    const environment = input.environment || 'local';
+    const installationRef = this.resolveInstallationRef(kind, input.installationPath, environment);
     const rawConfigDir = input.configDir || defaultConfigDirFor(kind, this.env);
-    const canonicalConfigDir = rawConfigDir ? canonicalizeConfigDir(rawConfigDir) : null;
+    const canonicalConfigDir = rawConfigDir ? canonicalizeConfigDir(rawConfigDir, environment) : null;
 
     // Prevent pointing configDir at the workbench's own database directory.
     if (canonicalConfigDir && this.userDataPath) {
