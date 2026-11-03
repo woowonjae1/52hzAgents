@@ -12,6 +12,9 @@ import {
   Sparkles,
   ArrowLeft,
   ChevronRight,
+  ShieldCheck,
+  FileCode2,
+  Terminal,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import { isDraftSessionId } from "@/lib/workspace-context";
@@ -346,7 +349,7 @@ export function SessionRuntimeControls({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`当前 Agent：${agentName}，工作模式：${modeLabels[runtime.config.mode]}${busy ? '（执行中）' : ''}`}
+          aria-label={`当前 Agent：${agentName}${busy ? '（执行中）' : ''}`}
           className="inline-flex h-8 min-w-0 max-w-72 items-center gap-1.5 rounded-lg px-2.5 text-xs text-foreground-muted transition-colors hover:bg-surface2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {busy ? (
@@ -356,8 +359,8 @@ export function SessionRuntimeControls({
           )}
           <span className="truncate font-medium text-foreground">{agentName}</span>
           <span aria-hidden="true" className="h-3 w-px shrink-0 bg-border/70 mx-0.5" />
-          <span className={cn("shrink-0", busy ? "text-primary font-medium" : "text-foreground-muted")}>
-            {busy ? '执行中' : modeLabels[runtime.config.mode]}
+          <span className={cn("shrink-0 text-3xs px-1.5 py-0.5 rounded", busy ? "bg-primary/10 text-primary font-medium" : nativeClient ? "bg-surface3 text-foreground-muted font-normal" : "bg-surface2 text-foreground-extra-muted font-normal")}>
+            {busy ? '执行中' : nativeClient ? '原生' : '内置'}
           </span>
           <ChevronDown className="size-3.5 shrink-0 text-foreground-extra-muted ml-0.5" />
           {runtime.queued > 0 && (
@@ -508,65 +511,48 @@ export function SessionRuntimeControls({
               )}
             </div>
 
-            {/* Mode Segmented Controls */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-2xs text-foreground-muted">
-                <span>工作方式</span>
-                <span className="text-foreground-extra-muted text-3xs">
-                  上限：{modeLabels[maxMode]}
+            {/* Agent Capability & Policy Card */}
+            <div className="space-y-2 p-3 rounded-lg border border-border/50 bg-surface1/60">
+              <div className="flex items-center justify-between text-2xs">
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  <span>执行权限与策略</span>
+                </span>
+                <span className="text-3xs text-foreground-extra-muted">
+                  {nativeClient ? "原生客户端策略" : "工作台策略"}
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface2/60 p-1" role="group">
-                {modes.map((mode) => {
-                  const restricted = modes.indexOf(mode) > modes.indexOf(maxMode) || Boolean(nativeClient && mode === 'chat');
-                  const active = form.mode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      disabled={busy || restricted}
-                      aria-pressed={active}
-                      title={restricted ? nativeClient && mode === 'chat' ? "此客户端暂不支持无工具对话" : "超出此 Agent 允许的最高模式" : undefined}
-                      onClick={() => void applyModeChange(mode)}
-                      className={cn(
-                        "rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35",
-                        active
-                          ? "bg-background font-medium text-foreground shadow-xs"
-                          : "text-foreground-muted hover:text-foreground"
-                      )}
-                    >
-                      {modeLabels[mode]}
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-2 gap-2 text-2xs pt-1">
+                <div className="flex items-center gap-1.5 text-foreground-muted">
+                  <FileCode2 className="size-3 shrink-0 text-foreground-extra-muted" />
+                  <span>
+                    {runtime.agent?.permissions?.writeFiles !== false ? "修改文件需审批" : "只读 (禁止改写)"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-foreground-muted">
+                  <Terminal className="size-3 shrink-0 text-foreground-extra-muted" />
+                  <span>
+                    {runtime.agent?.permissions?.executeCommands !== false ? "命令执行需审批" : "禁用外部命令"}
+                  </span>
+                </div>
               </div>
 
-              <p className="text-2xs leading-relaxed text-foreground-extra-muted min-h-8">
-                {busy && !saving
-                  ? "任务正在执行中，结束后可调整设置。"
-                  : form.mode === "chat"
-                  ? "纯对话交流，不调用任何项目读写或终端工具。"
-                  : form.mode === "plan"
-                  ? runtime.agent?.permissions.readFiles === false
-                    ? "仅分析已提供的上下文材料，不读取文件。"
-                    : "只读分析并提供方案，不修改任何项目代码。"
-                  : nativeClient
-                  ? "文件修改需审批；终端权限升级暂不支持。"
-                  : runtime.agent?.permissions.executeCommands === false
-                  ? "可实施修改代码，不执行外部命令。"
-                  : "可实施修改代码；终端命令仍受白名单与审批保护。"}
+              <p className="text-3xs leading-relaxed text-foreground-extra-muted pt-1 border-t border-border/40">
+                {nativeClient
+                  ? "由原生客户端环境执行任务，严格遵守执行前审批与工作区隔离。"
+                  : "由工作台内置执行器驱动，权限在 Agent 设置中集中管理。"}
               </p>
             </div>
 
             {/* Model Resource / Override Section */}
-            {nativeClient ? <p className="text-2xs text-foreground-muted border-t border-border/50 pt-2">{runtime.agent?.runtimeKind === 'codex' ? 'Codex' : runtime.agent?.runtimeKind} 客户端管理登录、执行资源和上下文。工作台硬预算不兼容时会阻止任务。</p> : <div className="pt-2 border-t border-border/50 space-y-2">
+            <div className="pt-2 border-t border-border/50 space-y-2">
               <div className="flex items-center justify-between text-2xs">
-                <span className="text-foreground-extra-muted">底层执行资源</span>
+                <span className="text-foreground-extra-muted">模型配置来源</span>
                 {hasCustomOverride ? (
-                  <span className="text-status-warning font-medium">任务级独立覆盖</span>
+                  <span className="text-status-warning font-medium">会话临时覆盖</span>
                 ) : (
-                  <span className="text-status-success font-medium">已继承 Agent 默认</span>
+                  <span className="text-status-success font-medium">已关联 Agent</span>
                 )}
               </div>
 
@@ -575,7 +561,7 @@ export function SessionRuntimeControls({
                   <div className="flex items-start gap-1.5 text-status-warning">
                     <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium">当前会话存在自定义模型配置</p>
+                      <p className="font-medium">当前会话存在自定义模型参数</p>
                       <p className="font-mono text-3xs mt-0.5 opacity-85">
                         {form.provider} · {form.model}
                       </p>
@@ -593,15 +579,20 @@ export function SessionRuntimeControls({
                   </Button>
                 </div>
               ) : (
-                <div className="px-1 text-2xs text-foreground-extra-muted flex items-center justify-between">
-                  <span className="truncate font-mono">
-                    {runtime.agent?.modelResource
+                <div className="p-2 rounded-md bg-surface2/40 text-2xs text-foreground-muted flex items-center justify-between">
+                  <span className="truncate">
+                    {nativeClient
+                      ? `${runtime.agent?.runtimeKind === 'codex' ? 'Codex' : 'Pi'} 原生配置`
+                      : runtime.agent?.modelResource
                       ? `${runtime.agent.modelResource.connectionId} / ${runtime.agent.modelResource.modelId}`
                       : `${form.provider} / ${form.model}`}
                   </span>
+                  <span className="text-3xs text-foreground-extra-muted shrink-0 ml-2">
+                    {nativeClient ? "原生管理" : "托管"}
+                  </span>
                 </div>
               )}
-            </div>}
+            </div>
           </>
         )}
       </PopoverContent>
