@@ -3,6 +3,9 @@
 const { fail, locate, stopChild, buildSanitizedNativeEnv } = require('./agents/adapters/common');
 const { safeFileChanges, runCodex } = require('./agents/adapters/codex');
 const { runNativePi } = require('./agents/adapters/pi-native');
+const { runAntigravity } = require('./agents/adapters/antigravity');
+const { runOpenclaw } = require('./agents/adapters/openclaw');
+const { runHermes } = require('./agents/adapters/hermes');
 const { resolveNativeAdapterKind, runNativeAdapter } = require('./agents/registry');
 
 function listRuntimes(env = process.env) {
@@ -16,15 +19,23 @@ function listRuntimes(env = process.env) {
       modes: ['chat', 'plan', 'agent'],
       reason: '随工作台打包的 Pi SDK 循环；执行资源在高级设置中配置。不读取本机 Pi 配置。',
     },
-    ...['codex', 'antigravity', 'gemini'].map(kind => {
+    ...['codex', 'antigravity', 'openclaw', 'hermes', 'gemini'].map(kind => {
       const installed = Boolean(locate(kind, env));
       const supported = kind === 'codex';
+      const names = {
+        codex: 'Codex',
+        antigravity: 'Antigravity',
+        openclaw: 'OpenClaw',
+        hermes: 'Hermes',
+        gemini: 'Gemini CLI',
+      };
       return {
         kind,
-        name: { codex: 'Codex', antigravity: 'Antigravity', gemini: 'Gemini CLI' }[kind],
+        name: names[kind] || kind,
         installed,
         supported,
         modes: supported ? ['plan', 'agent'] : [],
+        budgetBlocked: kind === 'codex',
         authentication: 'local-client',
         usage: 'turn-total',
         hardRequestBudgets: false,
@@ -36,7 +47,7 @@ function listRuntimes(env = process.env) {
               ? '未检测到本地客户端。'
               : !supported
                 ? '已检测到客户端；审批与权限隔离适配尚未通过，暂不派发任务。'
-                : '复用本机登录；支持只读沙箱和工作区写入。安装状态不代表登录或服务已验证。',
+                : '复用本机登录；支持安全权限与工作区沙箱执行。安装状态不代表登录或服务已验证。',
       };
     }),
   ];
@@ -53,6 +64,18 @@ function resolveDefaultRuntimeStatus(agent, env = process.env) {
       supported: true,
       modes: ['plan', 'agent'],
       reason: installed ? '复用本机 Pi 配置与登录。' : '未检测到本地 Pi 客户端。',
+    };
+  }
+  if (adapterKind === 'native-antigravity' || adapterKind === 'native-openclaw' || adapterKind === 'native-hermes') {
+    const rawKind = adapterKind.replace(/^native-/, '');
+    const installed = Boolean(locate(rawKind, env));
+    return {
+      kind: agent.runtimeKind,
+      name: rawKind,
+      installed,
+      supported: true,
+      modes: ['plan', 'agent'],
+      reason: installed ? '复用本机登录；支持安全权限与工作区沙箱执行。' : '未检测到本地客户端。',
     };
   }
   return listRuntimes(env).find(item => item.kind === agent.runtimeKind);
@@ -87,7 +110,7 @@ function assertNativePolicy(
         'RUNTIME_CAPABILITY'
       );
     }
-  } else {
+  } else if (adapterKind === 'native-codex') {
     if (
       !p.readFiles ||
       !p.executeCommands ||
@@ -99,6 +122,35 @@ function assertNativePolicy(
     ) {
       throw fail(
         'Codex 原生工具要求文件读取和命令权限；实施还需写入权限。暂不支持工作台 MCP、知识工具、委派或自定义工具白名单。',
+        'RUNTIME_CAPABILITY'
+      );
+    }
+  } else if (adapterKind === 'native-antigravity') {
+    if (
+      !p.readFiles ||
+      (config.mode === 'agent' && !p.writeFiles) ||
+      p.mcp ||
+      p.delegate ||
+      p.knowledge ||
+      agent.profileTools?.length
+    ) {
+      throw fail(
+        'Antigravity 原生执行要求开启文件读取权限；实施模式需开启文件修改权限。暂不支持工作台 MCP、知识工具或委派。',
+        'RUNTIME_CAPABILITY'
+      );
+    }
+  } else if (adapterKind === 'native-openclaw' || adapterKind === 'native-hermes') {
+    if (
+      !p.readFiles ||
+      (config.mode === 'agent' && !p.writeFiles) ||
+      p.mcp ||
+      p.delegate ||
+      p.knowledge ||
+      agent.profileTools?.length
+    ) {
+      const clientName = adapterKind === 'native-openclaw' ? 'OpenClaw' : 'Hermes';
+      throw fail(
+        `${clientName} 原生执行要求开启文件读取权限；实施模式需开启文件修改权限。暂不支持工作台 MCP、知识工具或委派。`,
         'RUNTIME_CAPABILITY'
       );
     }
@@ -127,6 +179,9 @@ module.exports = {
   safeFileChanges,
   runCodex,
   runNativePi,
+  runAntigravity,
+  runOpenclaw,
+  runHermes,
   runNativeAdapter,
   stopChild,
   buildSanitizedNativeEnv,

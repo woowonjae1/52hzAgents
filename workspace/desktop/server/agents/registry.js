@@ -3,12 +3,18 @@
 const { locate, fail } = require('./adapters/common');
 const { runCodex, safeFileChanges } = require('./adapters/codex');
 const { runNativePi, parseNativeModelSpec, buildAllowedPiTools } = require('./adapters/pi-native');
+const { runAntigravity, buildAntigravityArgs } = require('./adapters/antigravity');
+const { runOpenclaw } = require('./adapters/openclaw');
+const { runHermes } = require('./adapters/hermes');
 const { probeClients, readVersion } = require('./capabilities');
 
 function resolveNativeAdapterKind(agent, connection = null) {
   const connKind = connection?.kind || connection?.adapterKind || agent?.execution?.connectionKind || null;
   if (connKind === 'native-pi' || connKind === 'pi-native') return 'native-pi';
   if (connKind === 'native-codex' || agent?.runtimeKind === 'codex') return 'native-codex';
+  if (connKind === 'native-antigravity' || agent?.runtimeKind === 'antigravity') return 'native-antigravity';
+  if (connKind === 'native-openclaw' || agent?.runtimeKind === 'openclaw') return 'native-openclaw';
+  if (connKind === 'native-hermes' || agent?.runtimeKind === 'hermes') return 'native-hermes';
   if (agent?.runtimeKind && agent.runtimeKind !== 'pi') return `native-${agent.runtimeKind}`;
   return null;
 }
@@ -20,7 +26,13 @@ async function getConnectionCapabilitySnapshot(connection, { env = process.env, 
     ? 'pi-native'
     : rawKind === 'native-codex'
       ? 'codex'
-      : rawKind.replace(/^native-/, '');
+      : rawKind === 'native-antigravity'
+        ? 'antigravity'
+        : rawKind === 'native-openclaw'
+          ? 'openclaw'
+          : rawKind === 'native-hermes'
+            ? 'hermes'
+            : rawKind.replace(/^native-/, '');
   const probe = await probeClients({ env, versions: false });
   const row = probe.clients.find(c => c.kind === probeKind) || null;
   const launch = locate(rawKind, env);
@@ -43,6 +55,18 @@ async function getConnectionCapabilitySnapshot(connection, { env = process.env, 
     capabilities.preExecutionApproval = { status: 'verified', evidence: 'item/fileChange/requestApproval bounded patch' };
     capabilities.configRead = { status: 'verified', evidence: 'NativeConfigService + config/read' };
     capabilities.configWrite = { status: 'verified', evidence: 'lossless TOML top-level patch' };
+  } else if (rawKind === 'native-antigravity') {
+    capabilities.structuredStream = { status: 'verified', evidence: 'agy JSON stream events' };
+    capabilities.completionEvent = { status: 'verified', evidence: 'result/agent_response terminal state' };
+    capabilities.preExecutionApproval = { status: 'verified', evidence: '安全权限策略与审批拦截' };
+  } else if (rawKind === 'native-openclaw') {
+    capabilities.structuredStream = { status: 'verified', evidence: 'openclaw CLI query stream' };
+    capabilities.completionEvent = { status: 'verified', evidence: 'process exit code verification' };
+    capabilities.sameConnectionConcurrency = { status: 'verified', evidence: '共享 Profile 互斥排他保护' };
+  } else if (rawKind === 'native-hermes') {
+    capabilities.structuredStream = { status: 'verified', evidence: 'hermes query file execution' };
+    capabilities.completionEvent = { status: 'verified', evidence: 'process exit code verification' };
+    capabilities.sameConnectionConcurrency = { status: 'verified', evidence: 'Profile 并发互斥排他保护' };
   }
 
   return {
@@ -66,6 +90,15 @@ async function runNativeAdapter(agent, options, deps = {}) {
   if (kind === 'native-codex') {
     return runCodex(options, deps);
   }
+  if (kind === 'native-antigravity') {
+    return runAntigravity(options, deps);
+  }
+  if (kind === 'native-openclaw') {
+    return runOpenclaw(options, deps);
+  }
+  if (kind === 'native-hermes') {
+    return runHermes(options, deps);
+  }
   throw fail(`Unsupported native adapter kind: ${kind || agent?.runtimeKind || 'unknown'}`);
 }
 
@@ -75,6 +108,10 @@ module.exports = {
   runNativeAdapter,
   runCodex,
   runNativePi,
+  runAntigravity,
+  runOpenclaw,
+  runHermes,
+  buildAntigravityArgs,
   safeFileChanges,
   parseNativeModelSpec,
   buildAllowedPiTools,

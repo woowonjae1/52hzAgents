@@ -30,6 +30,9 @@ function resolveShim(shimPath) {
 const NPM_SCRIPTS_BY_KIND = Object.freeze({
   codex: [['@openai', 'codex', 'bin', 'codex.js']],
   pi: [['@earendil-works', 'pi-coding-agent', 'dist', 'cli.js']],
+  antigravity: [['@google', 'antigravity', 'dist', 'cli.js']],
+  openclaw: [['openclaw', 'openclaw.mjs'], ['openclaw', 'bin', 'openclaw.js']],
+  hermes: [['hermes-agent', 'bin', 'hermes.js']],
 });
 
 /**
@@ -40,8 +43,20 @@ function locate(kind, env = process.env) {
     ? 'pi'
     : kind === 'native-codex'
       ? 'codex'
-      : kind;
-  const names = normalizedKind === 'antigravity' ? ['agy'] : [normalizedKind];
+      : kind === 'native-antigravity'
+        ? 'antigravity'
+        : kind === 'native-openclaw'
+          ? 'openclaw'
+          : kind === 'native-hermes'
+            ? 'hermes'
+            : String(kind || '').replace(/^native-/, '');
+  const names = normalizedKind === 'antigravity'
+    ? ['agy', 'antigravity']
+    : normalizedKind === 'openclaw'
+      ? ['openclaw']
+      : normalizedKind === 'hermes'
+        ? ['hermes']
+        : [normalizedKind];
   const directories = String(env.PATH || env.Path || '')
     .split(path.delimiter)
     .filter(Boolean);
@@ -139,6 +154,48 @@ async function stopChild(child) {
   }
 }
 
+/**
+ * In-memory mutex for shared Profiles, Gateways and session files (R5 concurrency protection).
+ * Ensures multiple tasks using the same Profile or Gateway serialize critical mutations.
+ */
+const SHARED_RESOURCE_LOCKS = new Map();
+
+async function acquireSharedResourceLock(resourceKey, { timeoutMs = 15000, holder = null } = {}) {
+  const key = String(resourceKey || '').trim();
+  if (!key) throw fail('Resource key is required for shared lock.', 'LOCK_KEY_MISSING', 400);
+  const start = Date.now();
+  while (SHARED_RESOURCE_LOCKS.has(key)) {
+    if (Date.now() - start > timeoutMs) {
+      throw fail(`Timeout waiting for shared resource lock: ${key}`, 'RESOURCE_BUSY', 409);
+    }
+    await new Promise(r => setTimeout(r, 30));
+  }
+  let released = false;
+  const token = {
+    key,
+    holder,
+    acquiredAt: Date.now(),
+    release() {
+      if (!released) {
+        released = true;
+        if (SHARED_RESOURCE_LOCKS.get(key) === token) {
+          SHARED_RESOURCE_LOCKS.delete(key);
+        }
+      }
+    },
+  };
+  SHARED_RESOURCE_LOCKS.set(key, token);
+  return token;
+}
+
+function getSharedResourceLock(resourceKey) {
+  return SHARED_RESOURCE_LOCKS.get(String(resourceKey || '').trim()) || null;
+}
+
+function clearAllSharedResourceLocks() {
+  SHARED_RESOURCE_LOCKS.clear();
+}
+
 module.exports = {
   fail,
   isFile,
@@ -146,4 +203,7 @@ module.exports = {
   locate,
   buildSanitizedNativeEnv,
   stopChild,
+  acquireSharedResourceLock,
+  getSharedResourceLock,
+  clearAllSharedResourceLocks,
 };
