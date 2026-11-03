@@ -15,7 +15,8 @@ class HumanInteractionsRepository {
   get(id) { return this.map(this.db.prepare('SELECT * FROM human_interactions WHERE id=?').get(id)); }
   list({ channel = null, runId = null } = {}) {
     return this.db.prepare(`SELECT * FROM human_interactions WHERE (? IS NULL OR channel=?)
-      AND (? IS NULL OR run_id=?) ORDER BY created_at DESC, id DESC LIMIT 100`)
+      AND (? IS NULL OR run_id=?) ORDER BY CASE WHEN state IN ('waiting','answered','sent') THEN 0 ELSE 1 END,
+      created_at DESC, id DESC LIMIT 100`)
       .all(channel, channel, runId, runId).map(row => this.map(row));
   }
   create(spec) {

@@ -201,7 +201,9 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
       try {
         if (pathname === '/v1/interactions' && req.method === 'GET') {
           if (typeof query.channel !== 'string' || !query.channel) return sendJson(res, 400, { error: 'channel is required' });
-          return sendJson(res, 200, { interactions: store.storage.humanInteractions.list({ channel: query.channel }) });
+          return sendJson(res, 200, { interactions: store.storage.humanInteractions.list({ channel: query.channel }),
+            notifications: [...agentRunner.active.values()].filter(run => run.snapshot.channel === query.channel && run.snapshot.nativeNotification?.message)
+              .map(run => ({ runId: run.runId, agentName: run.agentIdentity.name, ...run.snapshot.nativeNotification })) });
         }
         const taskInteractions = pathname.match(/^\/v1\/tasks\/([^/]+)\/interactions$/);
         if (taskInteractions && req.method === 'GET') return sendJson(res, 200,

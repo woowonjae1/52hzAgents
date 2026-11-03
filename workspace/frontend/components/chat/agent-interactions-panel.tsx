@@ -45,14 +45,14 @@ function InteractionCard({ item, refresh }: { item: Interaction; refresh: () => 
     <div className="flex items-center justify-between gap-3 text-xs"><strong>{item.agentName} · {item.kind === 'approval' ? '权限确认' : '需要你的回答'}</strong>
       <span role="status" className="text-foreground-muted">{states[item.state] || item.state}</span></div>
     {item.kind === 'approval' && <p className="mt-2 text-xs text-foreground-muted">原生扩展的本次确认，与普通问题分开处理；不会授予后续操作或扩大工作台权限。</p>}
-    {item.questions.map(q => <fieldset key={q.id} disabled={busy || !waiting} className="mt-3 space-y-2">
+    {item.questions.map(q => <fieldset key={q.id} disabled={busy} className="mt-3 space-y-2">
       <legend className="whitespace-pre-wrap break-words text-sm">{q.title}</legend>
       {item.kind === 'question' && <>
         {q.options.map((option, index) => <label key={index} className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2">
-          <input type="radio" name={`${item.id}:${q.id}`} checked={(answers[q.id] ?? item.answer?.answers?.[q.id]?.[0]) === option.label} onChange={() => update(q.id, option.label)} className="mt-0.5" />
+          <input type="radio" disabled={!waiting} name={`${item.id}:${q.id}`} checked={(answers[q.id] ?? item.answer?.answers?.[q.id]?.[0]) === option.label} onChange={() => update(q.id, option.label)} className="mt-0.5" />
           <span><span className="text-xs">{option.label}</span>{option.description && <span className="mt-1 block text-xs text-foreground-muted">{option.description}</span>}</span>
         </label>)}
-        {q.allowFreeInput && <textarea aria-label={`${q.title}：输入答案`} value={answers[q.id] ?? item.answer?.answers?.[q.id]?.[0] ?? ''}
+        {q.allowFreeInput && <textarea readOnly={!waiting} aria-label={`${q.title}：输入答案`} value={answers[q.id] ?? item.answer?.answers?.[q.id]?.[0] ?? ''}
           onChange={e => update(q.id, e.target.value)} maxLength={20000} rows={3}
           placeholder={q.options.length ? '也可以填写自己的答案' : '输入答案'}
           className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60" />}
@@ -76,23 +76,25 @@ function InteractionCard({ item, refresh }: { item: Interaction; refresh: () => 
 
 export function AgentInteractionsPanel({ channel, running }: { channel: string | null; running: boolean }) {
   const [items, setItems] = React.useState<Interaction[]>([]);
+  const [notices, setNotices] = React.useState<{ runId: string; agentName: string; message: string }[]>([]);
   const [loadError, setLoadError] = React.useState('');
   const current = React.useRef(channel); current.current = channel;
   const refresh = React.useCallback(async () => {
     if (!channel || channel.startsWith('draft:')) return;
     try {
-      const result = await workspaceApi.request<{ interactions: Interaction[] }>(`/v1/interactions?channel=${encodeURIComponent(channel)}`);
-      if (current.current === channel) { setItems(result.interactions); setLoadError(''); }
+      const result = await workspaceApi.request<{ interactions: Interaction[]; notifications?: typeof notices }>(`/v1/interactions?channel=${encodeURIComponent(channel)}`);
+      if (current.current === channel) { setItems(result.interactions); setNotices(result.notifications || []); setLoadError(''); }
     } catch { if (current.current === channel) setLoadError('交互状态暂时无法同步。连接恢复后会重新读取，不会自动重复提交。'); }
   }, [channel]);
-  React.useEffect(() => { setItems([]); setLoadError(''); void refresh(); }, [refresh]);
+  React.useEffect(() => { setItems([]); setNotices([]); setLoadError(''); void refresh(); }, [refresh]);
   useVisibilityPolling(refresh, running ? 1000 : 5000);
   React.useEffect(() => { void refresh(); }, [running, refresh]);
   const waiting = items.filter(i => ['waiting','answered','sent'].includes(i.state));
   const history = items.filter(i => !['waiting','answered','sent'].includes(i.state)).slice(0, 10);
-  if (!items.length) return null;
+  if (!items.length && !notices.length) return null;
   return <div className="mt-3 max-h-96 space-y-2 overflow-y-auto" data-testid="agent-interactions">
     {!!loadError && <p role="status" className="text-xs text-foreground-muted">{loadError}</p>}
+    {notices.map(notice => <p key={notice.runId} role="status" className="text-xs text-foreground-muted">{notice.agentName} · {notice.message}</p>)}
     {waiting.map(item => <InteractionCard key={item.id} item={item} refresh={refresh} />)}
     {!!history.length && <details><summary className="cursor-pointer text-xs text-foreground-muted">提问与确认记录 ({history.length})</summary>
       <div className="mt-2 space-y-2">{history.map(item => <InteractionCard key={item.id} item={item} refresh={refresh} />)}</div>

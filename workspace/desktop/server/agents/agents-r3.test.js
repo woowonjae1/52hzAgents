@@ -110,6 +110,29 @@ test('R3 restart recovery distinguishes unsubmitted requests from delivery-unkno
   } finally { recovered.close(); reopened.close(); }
 });
 
+test('R3 system restore invalidates old requests even when the original owner PID is still alive', async t => {
+  const { storage, service } = fixture(t);
+  const pending = service.request(spec());
+  const rejected = assert.rejects(pending, e => e.code === 'INTERACTION_INVALIDATED');
+  const row = storage.humanInteractions.list()[0];
+  service.recover({ force: true });
+  await rejected;
+  assert.equal(storage.humanInteractions.get(row.id).state, 'invalidated');
+  assert.throws(() => service.answer(row.id, answerBody(row)), e => e.status === 409);
+});
+
+test('R3 unresolved questions stay visible when recent interaction history exceeds the display limit', t => {
+  const { storage } = fixture(t);
+  const waiting = storage.humanInteractions.create(spec({ timeoutMs: 60000 }));
+  for (let index = 0; index < 101; index++) {
+    const row = storage.humanInteractions.create(spec({ nativeRequestId: `history-${index}`, timeoutMs: 60000 }));
+    storage.humanInteractions.transition(row.id, 'waiting', 'continued');
+  }
+  const rows = storage.humanInteractions.list({ channel: 'r3' });
+  assert.equal(rows.length, 100);
+  assert.equal(rows[0].id, waiting.id);
+});
+
 test('R3 normalization keeps Pi confirmations separate and refuses secret input', () => {
   assert.equal(piQuestion({ id: 'c', method: 'confirm', title: '确认操作', message: '执行本次操作？' }).kind, 'approval');
   assert.throws(() => codexQuestion({ questions: [{ id: 's', question: 'Enter credential', isSecret: true }] }, 's'), e => e.code === 'AUTH_INPUT_NOT_ALLOWED');
@@ -198,6 +221,7 @@ for (const kind of ['pi', 'codex']) {
     let completed = false;
     const task = (kind === 'pi' ? runNativePi : runCodex)(options, { launch: fakeLaunch(root, kind) }).then(r => { completed = true; return r; });
     const row = await waitFor(() => storage.humanInteractions.list()[0]);
+    assert.equal(row.nativeSession, kind === 'pi' ? 'native-r3' : 'thread-r3');
     await new Promise(r => setTimeout(r, 30));
     assert.equal(completed, false, 'A waiting question is not a successful completed task');
     const body = { ...answerBody(row), answers: { [row.questions[0].id]: ['A'] } };
@@ -269,6 +293,18 @@ test('R3 AgentRunner + HTTP + native child retain waiting phase and continue the
   assert.equal(server.store.storage.runs.get(row.runId).phase,'finished');
   assert.equal(server.store.storage.humanInteractions.get(row.id).state,'continued');
   assert.equal(server.agentRunner.active.size,0);
+
+  // Even an adapter that incorrectly returns early cannot bypass the runner's completion guard.
+  server.agentRunner.nativeRuntime=async(_agent,opts)=>{
+    opts.onHumanInteraction({nativeRequestId:'unawaited-question',kind:'question',questions:spec().questions}).catch(()=>{});
+    return {content:'incorrect early completion',sdk:'test'};
+  };
+  const next=server.store.addEvent({type:'workspace.message.posted',source:'human:user',target:'channel/general',payload:{content:'Do not fake completion'}});
+  await server.agentRunner.handleUserMessage(next);
+  const rejectedRow=server.store.storage.humanInteractions.list({channel:'general'}).find(r=>r.nativeRequestId==='unawaited-question');
+  assert.equal(rejectedRow.state,'invalidated');
+  assert.equal(server.store.data.runtime_runs.find(r=>r.id===rejectedRow.runId).outcome,'failed');
+  assert.equal(server.store.data.runtime_runs.find(r=>r.id===rejectedRow.runId).error.code,'INTERACTION_PENDING');
 });
 
 test('R3 installed Pi runs the workbench question tool through real RPC without any model request', { timeout: 45000 }, async t => {

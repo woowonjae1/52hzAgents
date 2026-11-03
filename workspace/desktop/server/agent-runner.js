@@ -943,6 +943,7 @@ class AgentRunner {
         signal: run.controller.signal,
         onDelta,
       });
+      if (this.interactions?.isWaiting(run.runId)) throw Object.assign(new Error('任务仍有未处理或未投递的用户交互，不能标记完成。'), { code: 'INTERACTION_PENDING' });
       if (run.controller.signal.aborted) throw new Error("Aborted");
       if (result?.usage) run.usage = result.usage;
       if (result?.nativeSessionId || result?.nativeThreadId) {

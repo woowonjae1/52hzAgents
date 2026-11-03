@@ -203,6 +203,7 @@ async function runNativePi(
   let hasTurnUsage = false;
   const dialogs = new Set();
   const seenDialogs = new Set();
+  let currentNativeSessionId = binding?.nativeSessionId || null;
   let resolveTurn;
   let rejectTurn;
 
@@ -292,7 +293,7 @@ async function runNativePi(
         seenDialogs.add(event.id);
         dialogs.add(event.id);
         try {
-          const answer = await options.onHumanInteraction({ ...piQuestion(event), nativeSession: binding?.nativeSessionId || null });
+          const answer = await options.onHumanInteraction({ ...piQuestion(event), nativeSession: currentNativeSessionId });
           if (options.signal?.aborted) throw fail('Task cancelled.', 'ABORT_ERR');
           const response = answer.cancelled ? { cancelled: true } : event.method === 'confirm'
             ? { confirmed: answer.confirmed } : { value: answer.answers.value[0] };
@@ -486,6 +487,7 @@ async function runNativePi(
 
   try {
     const state = await request({ type: 'get_state' });
+    currentNativeSessionId = state?.sessionId || currentNativeSessionId;
     if (
       !state ||
       !state.model ||
