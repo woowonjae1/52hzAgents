@@ -26,7 +26,9 @@ import {
   Users,
   ChevronDown,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
+import { AgentIcon } from '@/components/icons/agent-icons';
 
 interface NativeAgentConnectionsPanelProps {
   onMemberCreated?: () => void;
@@ -268,27 +270,44 @@ export function NativeAgentConnectionsPanel({
             >
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-foreground">{cand.name}</span>
+                  <div className="flex items-center gap-2">
+                    <AgentIcon name={cand.probeKind} size={18} />
+                    <span className="text-xs font-semibold text-foreground">{cand.name}</span>
                     <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
                       {cand.stage}
                     </Badge>
                   </div>
-                  {cand.canRegister && sb.installationDetected && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-2xs gap-1"
-                      onClick={() => {
-                        setAddingKind(isAddingThis ? null : cand.candidateKind);
-                        setCustomMemberName(cand.name);
-                        setCustomConfigDir(cand.defaultConfigDir || '');
-                      }}
-                    >
-                      <Plus className="size-3" />
-                      <span>连接此 Agent</span>
-                    </Button>
-                  )}
+                  {cand.registeredConnections.length > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-3xs font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="size-2.5" />
+                      已接入
+                    </span>
+                  ) : cand.canRegister && sb.installationDetected ? (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        disabled={submittingAdd}
+                        className="h-7 px-2.5 text-2xs gap-1 font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
+                        onClick={() => void handleRegister(cand)}
+                      >
+                        <Zap className="size-3" />
+                        <span>一键连接</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-1.5 text-3xs text-foreground-muted hover:text-foreground cursor-pointer"
+                        title="自定义成员名称或 WSL 配置目录"
+                        onClick={() => {
+                          setAddingKind(isAddingThis ? null : cand.candidateKind);
+                          setCustomMemberName(cand.name);
+                          setCustomConfigDir(cand.defaultConfigDir || '');
+                        }}
+                      >
+                        <Settings2 className="size-3" />
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
 
                 <p className="text-2xs text-foreground-muted leading-relaxed">{cand.stageNote}</p>
