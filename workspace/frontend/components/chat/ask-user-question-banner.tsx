@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { HelpCircle, Check, Loader2 } from 'lucide-react';
+import { HelpCircle, Check, Loader2, ShieldAlert, Sparkles, MessageSquarePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface QuestionOption {
@@ -50,6 +50,8 @@ export const AskUserQuestionBanner = forwardRef<
 ) {
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [multiSelectLabels, setMultiSelectLabels] = useState<Set<string>>(new Set());
+  const [supplementaryNote, setSupplementaryNote] = useState<string>('');
+  const [submittedChoice, setSubmittedChoice] = useState<string | null>(null);
 
   const toQuestionAnswers = useCallback(
     (rec: Record<string, string[]>): QuestionAnswer[] =>
@@ -68,7 +70,14 @@ export const AskUserQuestionBanner = forwardRef<
 
   const currentQuestion = currentIndex < questions.length ? questions[currentIndex] : null;
   const isAllAnswered = currentIndex >= questions.length;
-  const disabled = isSubmitting || isTimedOut;
+  const disabled = isSubmitting || isTimedOut || Boolean(submittedChoice);
+
+  // Distinguish between destructive action authorization vs design direction choice
+  const isDestructive = useMemo(() => {
+    if (!currentQuestion) return false;
+    const text = (currentQuestion.question + ' ' + (currentQuestion.header || '')).toLowerCase();
+    return /删除|移除|覆盖|清理|delete|remove|overwrite|destroy|rm\s|drop/.test(text);
+  }, [currentQuestion]);
 
   const handleSelectOption = useCallback(
     (label: string) => {
@@ -85,9 +94,13 @@ export const AskUserQuestionBanner = forwardRef<
           return next;
         });
       } else {
+        const finalAnswer = supplementaryNote.trim()
+          ? `${label}（补充要求：${supplementaryNote.trim()}）`
+          : label;
+        setSubmittedChoice(finalAnswer);
         const newAnswers = {
           ...answers,
-          [currentQuestion.question]: [label],
+          [currentQuestion.question]: [finalAnswer],
         };
         setAnswers(newAnswers);
 
@@ -96,7 +109,7 @@ export const AskUserQuestionBanner = forwardRef<
         }
       }
     },
-    [disabled, currentQuestion, answers, currentIndex, questions.length, onSubmitAnswers, toQuestionAnswers]
+    [disabled, currentQuestion, answers, currentIndex, questions.length, onSubmitAnswers, toQuestionAnswers, supplementaryNote]
   );
 
   const handleConfirmMultiSelect = useCallback(() => {
@@ -105,6 +118,11 @@ export const AskUserQuestionBanner = forwardRef<
     const labels = Array.from(multiSelectLabels);
     if (labels.length === 0) return;
 
+    if (supplementaryNote.trim()) {
+      labels.push(`补充要求：${supplementaryNote.trim()}`);
+    }
+
+    setSubmittedChoice(labels.join('; '));
     const newAnswers = {
       ...answers,
       [currentQuestion.question]: labels,
@@ -115,13 +133,14 @@ export const AskUserQuestionBanner = forwardRef<
     if (currentIndex === questions.length - 1) {
       onSubmitAnswers(toQuestionAnswers(newAnswers));
     }
-  }, [disabled, currentQuestion, multiSelectLabels, answers, currentIndex, questions.length, onSubmitAnswers, toQuestionAnswers]);
+  }, [disabled, currentQuestion, multiSelectLabels, answers, currentIndex, questions.length, onSubmitAnswers, toQuestionAnswers, supplementaryNote]);
 
   useImperativeHandle(
     ref,
     () => ({
       submitCustomAnswer: (text: string) => {
         if (disabled || !currentQuestion || !text.trim()) return;
+        setSubmittedChoice(text.trim());
         const newAnswers = {
           ...answers,
           [currentQuestion.question]: [text.trim()],
@@ -135,26 +154,41 @@ export const AskUserQuestionBanner = forwardRef<
     [disabled, currentQuestion, answers, currentIndex, questions.length, onSubmitAnswers, toQuestionAnswers]
   );
 
-  if ((isAllAnswered && !isSubmitting) || questions.length === 0) return null;
+  if ((isAllAnswered && !isSubmitting && !submittedChoice) || questions.length === 0) return null;
 
   return (
-    <div className={cn('border-b border-border/80 bg-surface1/60 p-3 select-none', className)}>
+    <div className={cn('border-b border-border/80 bg-surface1/80 p-3 select-none', className)}>
       {/* Header */}
-      <div className="flex items-center gap-2 mb-2">
-        <HelpCircle className="size-4 text-primary shrink-0" />
-        <span className="text-xs font-semibold text-foreground flex-1">
-          Agent Clarification Needed
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isDestructive ? (
+            <ShieldAlert className="size-4 text-status-warning shrink-0" />
+          ) : (
+            <Sparkles className="size-4 text-primary shrink-0" />
+          )}
+          <span className="text-xs font-semibold text-foreground truncate">
+            {isDestructive ? '操作授权确认' : '方案设计决策'}
+          </span>
+          <span className={cn(
+            'text-3xs px-1.5 py-0.5 rounded-full font-mono',
+            isDestructive ? 'bg-status-warning/15 text-status-warning' : 'bg-primary/15 text-primary'
+          )}>
+            {isDestructive ? '需明确授权' : '点击即选定'}
+          </span>
           {questions.length > 1 && (
-            <span className="text-foreground-muted ml-1.5 font-normal">
+            <span className="text-foreground-muted text-3xs font-normal">
               ({Math.min(currentIndex + 1, questions.length)}/{questions.length})
             </span>
           )}
-        </span>
+        </div>
+        <p className="text-4xs text-foreground-muted hidden sm:block">
+          选择后执行将继续推进；已执行操作修改将按新要求处理
+        </p>
       </div>
 
       {/* Current Question */}
       {currentQuestion && (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex items-center gap-2">
             {currentQuestion.header && (
               <span className="text-3xs font-medium font-mono text-foreground-muted bg-surface2 px-1.5 py-0.5 rounded border border-border/50">
@@ -162,7 +196,7 @@ export const AskUserQuestionBanner = forwardRef<
               </span>
             )}
             {currentQuestion.multiSelect && (
-              <span className="text-3xs text-foreground-extra-muted">Select all that apply</span>
+              <span className="text-3xs text-foreground-extra-muted">支持多选</span>
             )}
           </div>
 
@@ -170,9 +204,27 @@ export const AskUserQuestionBanner = forwardRef<
             {currentQuestion.question}
           </p>
 
-          <div className="flex flex-wrap gap-1.5 pt-1">
+          {/* Supplementary requirement input */}
+          {!submittedChoice && (
+            <div className="flex items-center gap-1.5 bg-surface0/90 rounded-md border border-border/70 px-2 py-1 focus-within:border-primary/60">
+              <MessageSquarePlus className="size-3 text-muted-foreground shrink-0" />
+              <input
+                type="text"
+                value={supplementaryNote}
+                onChange={(e) => setSupplementaryNote(e.target.value)}
+                placeholder="补充要求（可选，点击下方方案将一同提交）"
+                disabled={disabled}
+                className="w-full bg-transparent text-2xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Option buttons */}
+          <div className="flex flex-wrap gap-1.5 pt-0.5">
             {currentQuestion.options.map((opt) => {
-              const isSelected = currentQuestion.multiSelect && multiSelectLabels.has(opt.label);
+              const isSelected = currentQuestion.multiSelect
+                ? multiSelectLabels.has(opt.label)
+                : submittedChoice?.startsWith(opt.label);
               return (
                 <button
                   key={opt.label}
@@ -183,27 +235,32 @@ export const AskUserQuestionBanner = forwardRef<
                   className={cn(
                     'group relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all cursor-pointer font-medium',
                     isSelected
-                      ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                      ? 'border-primary bg-primary/15 text-primary shadow-xs font-semibold'
                       : 'border-border/80 bg-surface0 text-foreground-muted hover:border-primary/50 hover:text-foreground hover:bg-surface2',
-                    disabled && 'opacity-50 cursor-not-allowed'
+                    disabled && 'opacity-60 cursor-not-allowed'
                   )}
                 >
                   {isSelected && <Check className="size-3 text-primary shrink-0" />}
                   <span>{opt.label}</span>
+                  {opt.description && (
+                    <span className="text-3xs text-muted-foreground font-normal">
+                      · {opt.description}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {currentQuestion.multiSelect && multiSelectLabels.size > 0 && (
+          {currentQuestion.multiSelect && multiSelectLabels.size > 0 && !submittedChoice && (
             <div className="pt-1.5">
               <button
                 type="button"
                 disabled={disabled}
                 onClick={handleConfirmMultiSelect}
-                className="rounded-md bg-primary px-3 py-1 text-2xs font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                className="rounded-md bg-primary px-3 py-1 text-2xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                Confirm Selection ({multiSelectLabels.size})
+                确认选定方案 ({multiSelectLabels.size})
               </button>
             </div>
           )}
@@ -212,10 +269,19 @@ export const AskUserQuestionBanner = forwardRef<
 
       {error && <div className="mt-2 text-xs text-destructive">{error}</div>}
 
-      {isSubmitting && (
+      {(isSubmitting || submittedChoice) && (
         <div className="flex items-center gap-1.5 mt-2 text-2xs text-foreground-muted">
-          <Loader2 className="size-3 animate-spin text-primary" />
-          <span>Submitting answer to agent...</span>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="size-3 animate-spin text-primary" />
+              <span>正在提交决策给 Agent 并继续推进...</span>
+            </>
+          ) : (
+            <>
+              <Check className="size-3 text-status-success" />
+              <span>已选定决策：{submittedChoice}</span>
+            </>
+          )}
         </div>
       )}
     </div>

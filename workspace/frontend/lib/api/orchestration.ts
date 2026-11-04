@@ -53,6 +53,30 @@ export type LaneReviewStatus =
   | 'timed_out'
   | 'cancelled';
 
+export interface EvidenceCitation {
+  id: string;
+  type: 'video' | 'doc' | 'code' | 'web';
+  label: string;
+  timestamp?: string;
+  videoUrl?: string;
+  section?: string;
+  docPath?: string;
+  codePath?: string;
+  lineRange?: string;
+  quote?: string;
+  version?: number;
+}
+
+export interface LaneHandoff {
+  id: string;
+  targetAgent: string;
+  version: number;
+  notes?: string;
+  citations?: EvidenceCitation[];
+  status: 'sent' | 'adopted' | 'stale';
+  handedOffAt: string;
+}
+
 /** One agent's share of a started batch. `port` 0 = no dev-server port reserved. */
 export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus; review_status: LaneReviewStatus }> & {
   agent_id?: string;
@@ -66,7 +90,20 @@ export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLan
   reviewed_version?: number;
   review_worktree_path?: string | null;
   review_history?: { id: string; delivery_version: number; delivery_commit: string; reviewer_id: string; verdict: string; notes: string; verification: { worktree?: string | null; commands?: { command: string; exitCode?: number }[] } }[];
-  delivery?: { baseCommit: string; commit: string; changedFiles: string[]; diffstat: string } | null;
+  delivery?: {
+    baseCommit: string;
+    commit: string;
+    changedFiles: string[];
+    diffstat: string;
+    version?: number;
+    citations?: EvidenceCitation[];
+    handoffs?: LaneHandoff[];
+    latestHandoff?: LaneHandoff;
+    receivedHandoff?: { fromLaneId: string; fromAgent: string; version: number; handoffId: string; status: 'received' | 'adopted' };
+    materials?: { type: string; label: string; url?: string }[];
+  } | null;
+  phase?: string;
+  recent_activity?: string;
 };
 
 /** A batch that was actually started, with its lanes. */
@@ -224,6 +261,18 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     return this.request<ParallelBatch>(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/review/complete`,
       { method: 'POST', body: JSON.stringify(result) }
+    );
+  }
+
+  /** Hand off a completed lane's deliverable to another agent. */
+  async handoffParallelLane(
+    batchId: string,
+    agent: string,
+    input: { target_agent: string; deliverable_version?: number; notes?: string; citations?: EvidenceCitation[] }
+  ): Promise<{ success: boolean; handoff: LaneHandoff }> {
+    return this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/handoff`,
+      { method: 'POST', body: JSON.stringify(input) }
     );
   }
 

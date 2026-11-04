@@ -64,8 +64,10 @@ class Collaboration {
     }
   }
   owned(root, repo) {
-    if (!root || !fs.existsSync(root)) throw fail('Isolated worktree is missing; execution is blocked.');
-    const actual = canonical(root), managed = canonical(this.root);
+    if (!root || !fs.existsSync(root)) throw fail('Execution folder is missing; execution is blocked.');
+    const actual = canonical(root);
+    if (!repo) return actual;
+    const managed = canonical(this.root);
     if (!actual.startsWith(managed + path.sep) || actual === canonical(repo)) throw fail('Worktree is outside the application-managed directory.');
     if (canonical(this.git(root, ['rev-parse', '--show-toplevel']).trim()) !== actual) throw fail('Invalid isolated worktree root.');
     const common = cwd => canonical(path.resolve(cwd, this.git(cwd, ['rev-parse', '--git-common-dir']).trim()));
@@ -117,7 +119,8 @@ class Collaboration {
     if (parentRun?.snapshot.collaboration) throw fail('Nested collaboration is disabled.');
     const workers = input.workers || [];
     if (!Array.isArray(workers) || workers.length < 1 || workers.length > 4) throw fail('Choose 1–4 worker tasks.', 400);
-    if (input.isolation && input.isolation !== 'worktree') throw fail('Parallel execution requires isolated Git worktrees.', 400);
+    const isolation = input.isolation || 'worktree';
+    if (!['worktree', 'directory', 'shared', 'none'].includes(isolation)) throw fail('Invalid isolation mode.', 400);
     const prepared = workers.map((worker, index) => {
       if (typeof worker.task !== 'string' || !worker.task.trim() || worker.task.length > 16000) throw fail('Each worker needs a task of at most 16000 characters.', 400);
       if (worker.scope !== undefined && (typeof worker.scope !== 'string' || worker.scope.length > 500)) throw fail('Invalid worker scope.', 400);
@@ -134,19 +137,25 @@ class Collaboration {
     for (const worker of prepared) this.runner.validateNativeExecution?.(worker.actor,worker.config,{channel,execution:{kind:'lane'},nativeBudgetPolicy:policy});
     if (reviewer) { const actor=this.reviewActor(reviewer,verification); this.runner.validateNativeExecution?.(actor,this.actorConfig(actor),{channel,execution:{kind:'review',verification},nativeBudgetPolicy:policy}); }
     const project = this.store.getChannel(channel).working_dir;
-    if (!project || !fs.existsSync(project)) throw fail('Choose a Git project before starting collaboration.', 400);
-    const repo = this.git(project, ['rev-parse', '--show-toplevel']).trim();
-    if (canonical(repo) !== canonical(project)) throw fail('Choose the Git repository root as the project folder.', 400);
-    const base = this.git(repo, ['rev-parse', 'HEAD']).trim();
-    const branch = this.git(repo, ['symbolic-ref', '--short', 'HEAD']).trim();
+    let repo = '', base = '', branch = '';
+    if (isolation === 'worktree') {
+      if (!project || !fs.existsSync(project)) throw fail('Choose a Git project before starting collaboration.', 400);
+      repo = this.git(project, ['rev-parse', '--show-toplevel']).trim();
+      if (canonical(repo) !== canonical(project)) throw fail('Choose the Git repository root as the project folder.', 400);
+      base = this.git(repo, ['rev-parse', 'HEAD']).trim();
+      branch = this.git(repo, ['symbolic-ref', '--short', 'HEAD']).trim();
+    } else {
+      repo = project && fs.existsSync(project) ? canonical(project) : '';
+    }
     const tokenLimit = input.total_budget_tokens ?? 128000;
     if (!Number.isInteger(tokenLimit) || tokenLimit < 1 || tokenLimit > 1000000) throw fail('Invalid collaboration Token limit.', 400);
     if (this.db.prepare("SELECT 1 FROM parallel_batches WHERE channel_name = ? AND runtime_version = 1 AND status IN ('running','review','blocked')").get(channel)) throw fail('Finish or discard the current collaboration batch first.');
     const group = crypto.randomUUID();
-    const result = this.repository.createBatch({ channel_name: channel, workspace_id: '52hz', origin: parentRun ? 'agent' : 'board', isolation: 'worktree', repo_dir: repo,
+    const result = this.repository.createBatch({ channel_name: channel, workspace_id: '52hz', origin: parentRun ? 'agent' : 'board', isolation, repo_dir: repo,
       base_branch: base, review_agent: reviewer?.id || '', parent_run_id: parentRun?.runId || null, total_budget_tokens: tokenLimit,
       workers: prepared.map((worker, index) => ({ agent: worker.alias, task: worker.task, scope: worker.scope,
-        branch: `52hz/collaboration/${group}/${index + 1}`, worktree_path: path.join(this.root, group, `worker-${index + 1}`) })),
+        branch: isolation === 'worktree' ? `52hz/collaboration/${group}/${index + 1}` : '',
+        worktree_path: isolation === 'worktree' ? path.join(this.root, group, `worker-${index + 1}`) : (repo || this.root) })),
     });
     const id = result.run.batch.id;
     this.store.storage.transaction(db => {
@@ -182,12 +191,16 @@ class Collaboration {
     const review = lane.review_event_id === event.id;
     if (batch.channel_name !== channel || (lane.dispatch_event_id !== event.id && !review)) throw fail('Collaboration dispatch provenance does not match.');
     if (review ? lane.review_status !== 'running' || lane.review_run_id : lane.status !== 'running' || lane.claim_token) return null;
-    this.owned(lane.worktree_path, batch.repo_dir);
+    if (batch.isolation === 'worktree' && batch.repo_dir) {
+      this.owned(lane.worktree_path, batch.repo_dir);
+    }
     const actor = JSON.parse(review ? lane.review_snapshot_json : lane.agent_snapshot_json);
     this.store.storage.agentDefinitions.requireActive(actor.id);
     const effectiveActor = review ? this.reviewActor(actor,Boolean(batch.review_verification)) : actor;
     const executionRoot = review ? lane.review_worktree_path : lane.worktree_path;
-    this.owned(executionRoot,batch.repo_dir);
+    if (batch.isolation === 'worktree' && batch.repo_dir) {
+      this.owned(executionRoot,batch.repo_dir);
+    }
     return { kind: review ? 'review' : 'lane', batchId: batch.id, laneId: lane.id,
       actor:effectiveActor, config: this.actorConfig(effectiveActor), projectDir: executionRoot,
       contextKey: review ? `${lane.context_key}:review:${event.id}` : lane.context_key,
@@ -232,6 +245,9 @@ class Collaboration {
     });
   }
   capture(batch, lane) {
+    if (batch.isolation !== 'worktree' || !batch.repo_dir) {
+      return { baseCommit: '', commit: '', changedFiles: [], diffstat: '' };
+    }
     this.owned(lane.worktree_path, batch.repo_dir);
     if (this.git(lane.worktree_path, ['status', '--porcelain']).trim()) {
       this.git(lane.worktree_path, ['add', '--all', '--', '.']);
@@ -241,6 +257,68 @@ class Collaboration {
     return { baseCommit: batch.base_commit, commit,
       changedFiles: this.git(lane.worktree_path, ['diff', '--name-only', '-z', batch.base_commit, commit]).split('\0').filter(Boolean),
       diffstat: this.git(lane.worktree_path, ['diff', '--stat', batch.base_commit, commit]).trim() };
+  }
+  extractCitations(content = '', lane = null) {
+    if (!content || typeof content !== 'string') return [];
+    const citations = [];
+    const seen = new Set();
+    const timeRegex = /(?:^|\s|[(\[])(?:时间点[:：]?\s*)?(\d{1,2}:\d{2}(?::\d{2})?)(?:[)\]]|\s|$|[,，.。])/g;
+    let match;
+    while ((match = timeRegex.exec(content)) !== null) {
+      const ts = match[1];
+      if (!seen.has(`time:${ts}`)) {
+        seen.add(`time:${ts}`);
+        const idx = match.index;
+        const lineStart = content.lastIndexOf('\n', idx) + 1;
+        const lineEnd = content.indexOf('\n', idx);
+        const line = content.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
+        citations.push({
+          id: `cite-${crypto.randomUUID()}`,
+          type: 'video',
+          label: `${ts} 画面采样`,
+          timestamp: ts,
+          quote: line.length > 120 ? line.slice(0, 120) + '...' : line,
+          version: lane?.delivery_version ? lane.delivery_version + 1 : 1,
+        });
+      }
+    }
+    const docRegex = /(§\s*\d+(?:\.\d+)*|RFC-\d+|第\s*[0-9一二三四五六七八九十]+\s*[章节条部分]|Section\s+\d+(?:\.\d+)*)/g;
+    while ((match = docRegex.exec(content)) !== null) {
+      const sec = match[1].trim();
+      if (!seen.has(`doc:${sec}`)) {
+        seen.add(`doc:${sec}`);
+        const idx = match.index;
+        const lineStart = content.lastIndexOf('\n', idx) + 1;
+        const lineEnd = content.indexOf('\n', idx);
+        const line = content.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
+        citations.push({
+          id: `cite-${crypto.randomUUID()}`,
+          type: 'doc',
+          label: `${sec} 规范原文`,
+          section: sec,
+          quote: line.length > 120 ? line.slice(0, 120) + '...' : line,
+          version: lane?.delivery_version ? lane.delivery_version + 1 : 1,
+        });
+      }
+    }
+    const codeRegex = /([a-zA-Z0-9_\-./]+\.(?:ts|tsx|js|jsx|py|go|rs|json|md))(#L\d+(?:-L\d+)?)?/g;
+    while ((match = codeRegex.exec(content)) !== null) {
+      const filePath = match[1];
+      const lineRange = match[2] || '';
+      const full = `${filePath}${lineRange}`;
+      if (!seen.has(`code:${full}`) && !filePath.includes('node_modules')) {
+        seen.add(`code:${full}`);
+        citations.push({
+          id: `cite-${crypto.randomUUID()}`,
+          type: 'code',
+          label: full,
+          codePath: filePath,
+          lineRange: lineRange ? lineRange.replace('#L', '') : undefined,
+          version: lane?.delivery_version ? lane.delivery_version + 1 : 1,
+        });
+      }
+    }
+    return citations.slice(0, 8);
   }
   finish(context, run, record, result) {
     if (context.kind === 'pipeline') return this.finishPipeline(context, run, record, result);
@@ -274,7 +352,16 @@ class Collaboration {
       let success = record.outcome === 'finished' && !result?.isError;
       let delivery = null, error = record.error?.message || result?.content || '';
       if (success) { try { delivery = this.capture(batch, lane); } catch (err) { success = false; error = err.message; record.outcome = 'failed'; record.error = { code: 'DELIVERY_FAILED', message: error }; } }
-      if (delivery) Object.assign(delivery,{version:lane.delivery_version+1,runId:run.runId,evidence:record.evidence || null,agentId:lane.agent_id});
+      if (delivery) {
+        const citations = record.citations || this.extractCitations(result?.content || '', lane);
+        Object.assign(delivery,{
+          version: lane.delivery_version + 1,
+          runId: run.runId,
+          evidence: record.evidence || null,
+          citations,
+          agentId: lane.agent_id
+        });
+      }
       this.db.prepare(`UPDATE parallel_lanes SET status = ?, reply = ?, error = ?, commit_hash = ?, diffstat = ?, changed_files = ?, delivery_json = ?, finished_at = ?,delivery_version=delivery_version+? WHERE id = ? AND run_id = ?`)
         .run(success ? 'done' : 'failed', result?.content || '', success ? '' : error, delivery?.commit || '', delivery?.diffstat || '', delivery?.changedFiles.join('\n') || '', delivery ? JSON.stringify(delivery) : null, new Date().toISOString(),success?1:0, lane.id, run.runId);
     }
@@ -356,13 +443,17 @@ class Collaboration {
   humanReview(batchId, reference, input) {
     this.assertAvailable();
     const lane = this.lane(batchId, reference), batch = this.batch(batchId);
-    this.assertIdle(lane.worktree_path);
+    if (batch.isolation === 'worktree' && batch.repo_dir) {
+      this.assertIdle(lane.worktree_path);
+    }
     if (lane.status !== 'done' || lane.review_status === 'running') throw fail('Wait for this lane to finish before reviewing.');
     if (!['approved', 'changes_requested'].includes(input.verdict || input.status)) throw fail('Invalid review verdict.', 400);
     if(input.expected_commit!==lane.commit_hash || input.expected_version!==lane.delivery_version)throw fail('交付版本已变化或未提供版本，请刷新后重新审阅。');
     if((input.verdict || input.status)==='changes_requested' && (typeof input.notes!=='string' || !input.notes.trim()))throw fail('要求修改时请提供具体反馈。',400);
-    this.owned(lane.worktree_path, batch.repo_dir);
-    if (this.git(lane.worktree_path, ['rev-parse', 'HEAD']).trim() !== lane.commit_hash || this.git(lane.worktree_path, ['status', '--porcelain']).trim()) throw fail('Delivery changed; review is stale.');
+    if (batch.isolation === 'worktree' && batch.repo_dir) {
+      this.owned(lane.worktree_path, batch.repo_dir);
+      if (this.git(lane.worktree_path, ['rev-parse', 'HEAD']).trim() !== lane.commit_hash || this.git(lane.worktree_path, ['status', '--porcelain']).trim()) throw fail('Delivery changed; review is stale.');
+    }
     this.recordReview(lane,input.verdict || input.status,String(input.notes || '').slice(0,16000),'human:user');
     return this.publish(batchId);
   }
@@ -374,11 +465,15 @@ class Collaboration {
   retry(batchId, reference,input={}) {
     this.assertAvailable();
     const batch = this.batch(batchId), lane = this.lane(batchId, reference);
-    this.assertIdle(lane.worktree_path);
+    if (batch.isolation === 'worktree' && batch.repo_dir) {
+      this.assertIdle(lane.worktree_path);
+    }
     if (batch.status === 'done' || lane.status === 'running' || lane.review_status === 'running') throw fail('This lane cannot be retried now.');
     if(lane.status==='done' && (input.expected_commit!==lane.commit_hash || input.expected_version!==lane.delivery_version))throw fail('交付版本已变化，请刷新后再退回修改。');
     if (this.db.prepare("SELECT 1 FROM parallel_batches WHERE channel_name = ? AND runtime_version = 1 AND id != ? AND status IN ('running','review','blocked')").get(batch.channel_name, batchId)) throw fail('Another batch is active in this session.');
-    this.owned(lane.worktree_path, batch.repo_dir);
+    if (batch.isolation === 'worktree' && batch.repo_dir) {
+      this.owned(lane.worktree_path, batch.repo_dir);
+    }
     const previous = JSON.parse(lane.agent_snapshot_json);
     const actor = this.actor(previous.profileId || lane.agent_id);
     this.runner.validateNativeExecution?.(actor,this.actorConfig(actor),{channel:batch.channel_name,execution:{kind:'lane',batchId}});
@@ -405,6 +500,13 @@ class Collaboration {
     if(expectedDeliveries!==null && (!Array.isArray(expectedDeliveries) || expectedDeliveries.length!==lanes.length
       || new Set(expectedDeliveries.map(item=>item?.id)).size!==lanes.length
       || lanes.some(lane=>!expectedDeliveries.some(item=>item?.id===lane.id && item.commit===lane.commit_hash && item.version===lane.delivery_version))))throw fail('交付列表已变化，请刷新并检查当前版本后再验收。');
+    if (batch.isolation !== 'worktree' || !batch.repo_dir) {
+      this.store.storage.transaction(db => {
+        db.prepare("UPDATE parallel_lanes SET status = 'merged' WHERE batch_id = ?").run(batchId);
+        db.prepare("UPDATE parallel_batches SET status = 'done', finished_at = ? WHERE id = ?").run(new Date().toISOString(), batchId);
+      });
+      return this.publish(batchId);
+    }
     this.assertIdle(batch.repo_dir);
     for (const lane of lanes) {
       this.assertIdle(lane.worktree_path);
@@ -445,7 +547,11 @@ class Collaboration {
     return this.publish(batchId);
   }
   cleanup(batchId) {
-    const batch = this.batch(batchId), paths = this.db.prepare('SELECT worktree_path FROM parallel_lanes WHERE batch_id = ?').all(batchId).map(row => row.worktree_path);
+    const batch = this.batch(batchId);
+    if (batch.isolation !== 'worktree' || !batch.repo_dir) {
+      return this.publish(batchId);
+    }
+    const paths = this.db.prepare('SELECT worktree_path FROM parallel_lanes WHERE batch_id = ?').all(batchId).map(row => row.worktree_path);
     for(const row of this.db.prepare('SELECT review_worktree_path FROM parallel_lanes WHERE batch_id=?').all(batchId))if(row.review_worktree_path)paths.push(row.review_worktree_path);
     for(const row of this.db.prepare('SELECT verification_json FROM collaboration_reviews WHERE lane_id IN (SELECT id FROM parallel_lanes WHERE batch_id=?)').all(batchId)){
       const root=JSON.parse(row.verification_json).worktree;if(root && !paths.includes(root))paths.push(root);
@@ -461,6 +567,77 @@ class Collaboration {
     }
     for (const directory of paths) if (fs.existsSync(directory)) this.git(batch.repo_dir, ['worktree', 'remove', directory]);
     return this.publish(batchId);
+  }
+  handoff(batchId, reference, input = {}) {
+    const batch = this.batch(batchId);
+    const lane = this.lane(batchId, reference);
+    if (lane.status !== 'done') throw fail('Only completed deliverables can be handed off.', 400);
+    const targetAgent = input.target_agent || input.targetAgent;
+    if (!targetAgent) throw fail('Choose a target Agent to receive the deliverable.', 400);
+    const version = input.deliverable_version || lane.delivery_version || 1;
+    const notes = (input.notes || '').slice(0, 4000);
+    const citations = Array.isArray(input.citations) ? input.citations : [];
+
+    let currentDelivery = null;
+    try {
+      currentDelivery = lane.delivery_json ? JSON.parse(lane.delivery_json) : {};
+    } catch {
+      currentDelivery = {};
+    }
+    const handoffs = currentDelivery.handoffs || [];
+    const handoffRecord = {
+      id: crypto.randomUUID(),
+      targetAgent,
+      version,
+      notes,
+      citations,
+      status: 'sent',
+      handedOffAt: new Date().toISOString()
+    };
+    handoffs.push(handoffRecord);
+    currentDelivery.handoffs = handoffs;
+    currentDelivery.latestHandoff = handoffRecord;
+
+    this.db.prepare('UPDATE parallel_lanes SET delivery_json = ? WHERE id = ?')
+      .run(JSON.stringify(currentDelivery), lane.id);
+
+    // If another lane in the batch matches targetAgent, link received handoff
+    const targetLane = this.db.prepare('SELECT * FROM parallel_lanes WHERE batch_id = ? AND (agent_id = ? OR agent = ?)').get(batchId, targetAgent, targetAgent);
+    if (targetLane) {
+      let targetDelivery = null;
+      try { targetDelivery = targetLane.delivery_json ? JSON.parse(targetLane.delivery_json) : {}; } catch { targetDelivery = {}; }
+      targetDelivery.receivedHandoff = {
+        fromLaneId: lane.id,
+        fromAgent: lane.agent_id,
+        version,
+        handoffId: handoffRecord.id,
+        status: targetLane.status === 'running' || targetLane.status === 'done' ? 'adopted' : 'received'
+      };
+      this.db.prepare('UPDATE parallel_lanes SET delivery_json = ? WHERE id = ?').run(JSON.stringify(targetDelivery), targetLane.id);
+    }
+
+    const actor = JSON.parse(lane.agent_snapshot_json);
+    const saved = this.store.addEvent({
+      id: `handoff-${crypto.randomUUID()}`,
+      type: 'workspace.message.posted',
+      source: `orchestration:handoff:${lane.id}`,
+      target: `channel/${batch.channel_name}`,
+      payload: {
+        content: `[成果交接 · 成果 v${version}] 由 ${actor.name} 交给 @${targetAgent} 继续实现\n${notes ? `交接说明：${notes}\n` : ''}${citations.length ? `携带依据：${citations.map(c => c.label || c.quote).join('; ')}\n` : ''}\n交付摘要：\n${(lane.reply || '').slice(0, 800)}`,
+        sender_name: actor.name,
+        sender_type: 'handoff'
+      },
+      metadata: {
+        batch_id: batchId,
+        lane_id: lane.id,
+        handoff_id: handoffRecord.id,
+        target_agent: targetAgent,
+        version
+      }
+    });
+    this.broadcaster.broadcast(saved);
+    this.publish(batchId);
+    return { success: true, handoff: handoffRecord };
   }
   restoreTarget(channel, runId) {
     // Use the persisted execution snapshot, never a caller-provided worktree path.

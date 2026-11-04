@@ -323,3 +323,48 @@ test('unknown legacy actors reject, shared batch reservation blocks before model
   assert.equal(fs.readFileSync(path.join(lane.worktree_path, 'restart-evidence.txt'), 'utf8'), 'preserve');
   assert.equal(f.store.storage.db.prepare('SELECT reserved_tokens FROM parallel_lanes WHERE id = ?').get(lane.id).reserved_tokens, 0);
 });
+
+test('directory isolation supports materials analysis with citations and deliverable handoff', async t => {
+  const f = fixture(t, options => actualPi(options, [
+    fauxAssistantMessage('分析视频字幕与关键画面：在 00:15 采样点发现交互反馈延迟。依据 §2.1 规范原文，响应时间应小于 100ms。'),
+  ]));
+  const researcher = f.actor('Researcher', false);
+  const result = f.collaboration.start('general', {
+    isolation: 'directory',
+    workers: [{ agent_id: researcher.id, task: '分析视频字幕与关键画面，比对规范要求' }],
+  });
+  const batchId = result.run.batch.id;
+  await waitFor(() => f.runner.active.size === 0 && f.collaboration.view(batchId).run.lanes[0].status === 'done');
+  const lane = f.collaboration.view(batchId).run.lanes[0];
+  assert.equal(lane.status, 'done');
+  assert.ok(lane.delivery, 'Delivery should be captured');
+  assert.ok(lane.delivery.citations.length >= 2, 'Should extract video and doc citations');
+  const videoCite = lane.delivery.citations.find(c => c.type === 'video');
+  const docCite = lane.delivery.citations.find(c => c.type === 'doc');
+  assert.equal(videoCite.timestamp, '00:15');
+  assert.equal(docCite.section, '§2.1');
+
+  // Test handoff to codex
+  const handoffRes = f.collaboration.handoff(batchId, lane.id, {
+    target_agent: 'codex',
+    notes: '请基于 00:15 证据优化实现',
+    citations: [videoCite],
+  });
+  assert.equal(handoffRes.success, true);
+  assert.equal(handoffRes.handoff.targetAgent, 'codex');
+  assert.equal(handoffRes.handoff.status, 'sent');
+
+  // Check persisted handoff in lane view
+  const updatedLane = f.collaboration.view(batchId).run.lanes[0];
+  assert.equal(updatedLane.delivery.latestHandoff.targetAgent, 'codex');
+  assert.equal(updatedLane.delivery.latestHandoff.version, 1);
+
+  // Complete batch merge in non-worktree mode
+  f.collaboration.humanReview(batchId, lane.id, {
+    verdict: 'approved',
+    expected_commit: lane.commit_hash,
+    expected_version: lane.delivery_version,
+  });
+  const merged = f.collaboration.merge(batchId);
+  assert.equal(merged.run.batch.status, 'done');
+});

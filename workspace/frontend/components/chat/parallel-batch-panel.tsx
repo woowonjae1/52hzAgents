@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff, ShieldCheck, Clock, SkipForward, Undo2, MessagesSquare, Ban, FolderMinus, Check, X, FileText, Plus, Bot } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff, ShieldCheck, Clock, SkipForward, Undo2, MessagesSquare, Ban, FolderMinus, Check, X, FileText, Plus, Bot, Video, FileCode } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
-import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane, LaneReviewStatus, DeliveryDiffResult } from '@/lib/api/orchestration';
+import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane, LaneReviewStatus, DeliveryDiffResult, EvidenceCitation } from '@/lib/api/orchestration';
 import type { AgentDefinition } from '@/lib/api/agent-definitions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { toast } from '@/lib/toast';
@@ -109,13 +109,12 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
           className
         )}
       >
-        <p className="text-xs font-medium text-foreground">Waiting for the work to be split</p>
+        <p className="text-xs font-medium text-foreground">等待分配协作任务与材料</p>
         <p className="text-2xs text-muted-foreground mt-1 leading-snug">
-          Name two or more agents in one message (<code className="text-2xs">@a do X @b do Y</code>) or
-          assign tasks on the board. Everyone starts at once.{' '}
+          在消息中提及多个 Agent（如 <code className="text-2xs">@antigravity 分析视频 @pi 阅读规范 @codex 检查项目</code>）或点击下方分配任务，成员将立即并行处理。{' '}
           {batch.isolated
-            ? 'This project is a git repository, so each agent works in its own worktree and the results are merged back when all of them finish.'
-            : 'Choose a Git project before starting parallel tasks. Each Agent needs an isolated worktree.'}
+            ? '本项目已配置 Git 仓库，代码任务可在独立工作副本中并行修改，确认后合入项目。'
+            : '普通任务将在当前工作区直接运行；涉及代码修改的任务可启用独立工作副本隔离。'}
         </p>
         {batch.isolated && (
           <ReviewSetting channelName={channelName} value={batch.review_agent} onSaved={reload} className="mt-2" />
@@ -336,10 +335,10 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
           )}
           <span className="text-2xs text-muted-foreground truncate">
             {reviewing
-              ? `nothing merged into ${base} yet`
+              ? `未合并入 ${base}`
               : run.batch.isolation === 'worktree'
-              ? `own worktrees${run.batch.base_branch ? ` · merges into ${run.batch.base_branch} after your review` : ''}`
-              : 'shared folder'}
+              ? `独立工作副本${run.batch.base_branch ? ` · 确认后合入 ${run.batch.base_branch}` : ''}`
+              : '常规工作区'}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -401,6 +400,77 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
                 <p className="text-2xs text-muted-foreground truncate" title={lane.task}>
                   {firstLine}
                 </p>
+                {/* Capability & Phase Badge */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  {/video|视频|字幕|帧/.test(lane.task.toLowerCase()) ? (
+                    <span className="inline-flex items-center gap-1 text-3xs font-mono px-1.5 py-0.5 rounded bg-surface2 text-primary border border-primary/20">
+                      <Video className="size-2.5" />
+                      <span>分析字幕与关键画面</span>
+                    </span>
+                  ) : /doc|spec|规范|文档|rfc/.test(lane.task.toLowerCase()) ? (
+                    <span className="inline-flex items-center gap-1 text-3xs font-mono px-1.5 py-0.5 rounded bg-surface2 text-status-info border border-status-info/20">
+                      <FileText className="size-2.5" />
+                      <span>阅读规范与文档原文</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-3xs font-mono px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border">
+                      <FileCode className="size-2.5" />
+                      <span>独立工作副本</span>
+                    </span>
+                  )}
+                  {lane.delivery_version ? (
+                    <span className="text-3xs font-mono text-muted-foreground">
+                      成果 v{lane.delivery_version}
+                    </span>
+                  ) : null}
+                </div>
+                {/* Evidence & Citations */}
+                {lane.delivery?.citations && lane.delivery.citations.length > 0 && (
+                  <div className="mt-2 p-2 rounded-lg border border-border/70 bg-surface0/90 space-y-1.5">
+                    <div className="flex items-center justify-between text-3xs font-medium text-foreground-muted">
+                      <span>依据与引用片段 ({lane.delivery.citations.length})</span>
+                      <span className="text-4xs text-foreground-extra-muted">可直接追问或交接</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {lane.delivery.citations.map((cite) => (
+                        <CitationPill
+                          key={cite.id}
+                          citation={cite}
+                          onFollowUp={(text) => {
+                            const inputEl = document.querySelector('textarea[placeholder*="Ask"], textarea[placeholder*="输入"]') as HTMLTextAreaElement | null;
+                            if (inputEl) {
+                              inputEl.value = text;
+                              inputEl.focus();
+                            }
+                            toast.success('已载入依据片段，可直接追问');
+                          }}
+                          onHandoff={() => {
+                            const other = run.lanes.find((l) => l.id !== lane.id);
+                            const target = other?.agent_name || other?.agent || 'codex';
+                            void workspaceApi.handoffParallelLane(run.batch.id, lane.id || lane.agent, {
+                              target_agent: target,
+                              deliverable_version: lane.delivery_version || 1,
+                              citations: [cite],
+                              notes: `基于【${cite.label}】依据推进实现`,
+                            }).then(() => {
+                              toast.success(`已携带依据交接给 @${target}`);
+                              onRetried();
+                            }).catch((err) => toast.error(err instanceof Error ? err.message : '交接失败'));
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Handoff Status & Quick Actions */}
+                {lane.status === 'done' && (
+                  <LaneHandoffBar
+                    batchId={run.batch.id}
+                    lane={lane}
+                    allLanes={run.lanes}
+                    onHandoffSuccess={onRetried}
+                  />
+                )}
                 {lane.branch && lane.status !== 'merged' && (
                   <code className="mt-0.5 flex items-center gap-1 text-2xs text-muted-foreground truncate">
                     <GitBranch className="size-3 shrink-0" />
@@ -715,6 +785,226 @@ function LaneReview({
  * a lane's author review itself and falls back to another online agent.
  */
 
+function CitationPill({
+  citation,
+  onFollowUp,
+  onHandoff,
+}: {
+  citation: EvidenceCitation;
+  onFollowUp: (text: string) => void;
+  onHandoff: () => void;
+}) {
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const icon = citation.type === 'video' ? '🎬' : citation.type === 'doc' ? '📄' : '💻';
+
+  return (
+    <div className="relative inline-flex items-center rounded-md border border-border bg-surface1 px-2 py-0.5 text-2xs hover:border-primary/40 transition-colors">
+      <button
+        type="button"
+        onClick={() => setDetailOpen(!detailOpen)}
+        className="flex items-center gap-1 font-mono text-foreground hover:text-primary mr-1 cursor-pointer"
+        title={citation.quote || citation.label}
+      >
+        <span>{icon}</span>
+        <span className="font-semibold underline decoration-dashed underline-offset-2">{citation.label}</span>
+      </button>
+
+      <div className="flex items-center gap-1 border-l border-border/80 pl-1.5 ml-0.5">
+        <button
+          type="button"
+          onClick={() => onFollowUp(`关于【${citation.label}】（来源：成果 v${citation.version || 1}）：“${citation.quote || ''}”\n请基于此处深入分析：`)}
+          className="text-3xs text-muted-foreground hover:text-foreground font-sans hover:underline cursor-pointer"
+          title="以此片段追问当前 Agent"
+        >
+          以此追问
+        </button>
+        <span className="text-border">·</span>
+        <button
+          type="button"
+          onClick={onHandoff}
+          className="text-3xs text-primary hover:underline font-sans cursor-pointer font-medium"
+          title="将此依据与成果交接给下游 Agent"
+        >
+          发给下游
+        </button>
+      </div>
+
+      {detailOpen && citation.quote && (
+        <div className="absolute bottom-full left-0 mb-1 z-30 w-72 p-2.5 rounded-lg border border-border bg-surface-raised shadow-xl text-3xs font-sans space-y-1">
+          <div className="font-semibold text-foreground flex items-center justify-between">
+            <span>{citation.label} 原文与证据</span>
+            <button type="button" onClick={() => setDetailOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">✕</button>
+          </div>
+          <p className="text-foreground-muted whitespace-pre-wrap max-h-36 overflow-y-auto font-mono bg-surface0 p-1.5 rounded">
+            {citation.quote}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LaneHandoffBar({
+  batchId,
+  lane,
+  allLanes,
+  onHandoffSuccess,
+}: {
+  batchId: string;
+  lane: ParallelLane;
+  allLanes: ParallelLane[];
+  onHandoffSuccess: () => void;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const [targetAgent, setTargetAgent] = React.useState('codex');
+  const [openModal, setOpenModal] = React.useState(false);
+  const [notes, setNotes] = React.useState('');
+
+  const latestHandoff = lane.delivery?.latestHandoff;
+  const currentVersion = lane.delivery_version || 1;
+  const isStale = latestHandoff && currentVersion > latestHandoff.version;
+
+  const otherLanes = allLanes.filter((l) => l.id !== lane.id);
+
+  const doHandoff = async (agentName: string, customNotes?: string) => {
+    setBusy(true);
+    try {
+      await workspaceApi.handoffParallelLane(batchId, lane.id || lane.agent, {
+        target_agent: agentName,
+        deliverable_version: currentVersion,
+        notes: customNotes,
+        citations: lane.delivery?.citations,
+      });
+      toast.success(`已交接成果 v${currentVersion} 给 @${agentName}`);
+      setOpenModal(false);
+      onHandoffSuccess();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '交接失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-2xs">
+      {/* Existing handoff status */}
+      {latestHandoff && (
+        <div className={cn(
+          'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-3xs font-sans',
+          isStale
+            ? 'border-status-warning/40 bg-status-warning/10 text-status-warning'
+            : 'border-status-success/30 bg-status-success/10 text-status-success'
+        )}>
+          {isStale ? (
+            <>
+              <AlertTriangle className="size-2.5" />
+              <span>上游有新版 v{currentVersion}，尚未交接（当前交接为 v{latestHandoff.version}）</span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void doHandoff(latestHandoff.targetAgent)}
+                className="underline font-semibold ml-1 hover:text-foreground cursor-pointer"
+              >
+                交接最新版
+              </button>
+            </>
+          ) : (
+            <>
+              <Check className="size-2.5" />
+              <span>已发送给 @{latestHandoff.targetAgent} · 成果 v{latestHandoff.version}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Trigger new handoff */}
+      {(!latestHandoff || isStale) && (
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void doHandoff(targetAgent)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 font-medium cursor-pointer"
+          >
+            {busy ? <Loader2 className="size-2.5 animate-spin" /> : <GitMerge className="size-2.5" />}
+            <span>交给 @{targetAgent} 继续实现</span>
+          </button>
+
+          {otherLanes.length > 1 && (
+            <select
+              value={targetAgent}
+              onChange={(e) => setTargetAgent(e.target.value)}
+              className="h-6 rounded border border-border bg-surface0 px-1 text-3xs text-foreground font-mono"
+            >
+              {otherLanes.map((ol) => (
+                <option key={ol.id} value={ol.agent_name || ol.agent}>
+                  @{ol.agent_name || ol.agent}
+                </option>
+              ))}
+              <option value="codex">@codex</option>
+            </select>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setOpenModal(true)}
+            className="text-3xs text-muted-foreground hover:text-foreground underline ml-1 cursor-pointer"
+          >
+            补充说明
+          </button>
+        </div>
+      )}
+
+      {openModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="flex flex-col w-full max-w-md rounded-xl border border-border bg-surface-raised p-4 space-y-3">
+            <h4 className="text-xs font-semibold text-foreground">交接成果给下游 Agent</h4>
+            <p className="text-3xs text-muted-foreground">
+              将当前交付成果（版本 v{currentVersion}）与关联依据同步给下游成员作为输入上下文。
+            </p>
+            <div className="space-y-1">
+              <label className="text-3xs text-foreground-muted">接收 Agent：</label>
+              <input
+                type="text"
+                value={targetAgent}
+                onChange={(e) => setTargetAgent(e.target.value)}
+                className="w-full h-7 rounded border border-border bg-surface0 px-2 text-2xs text-foreground font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-3xs text-foreground-muted">交接指令与要求说明：</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="例如：结合视频采样与规范第2条，检查当前项目是否有遗漏..."
+                rows={3}
+                className="w-full rounded border border-border bg-surface0 p-2 text-2xs text-foreground resize-y"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setOpenModal(false)}
+                className="px-2.5 py-1 rounded text-2xs text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void doHandoff(targetAgent, notes)}
+                className="px-3 py-1 rounded bg-primary text-primary-foreground text-2xs font-semibold hover:bg-primary/90 cursor-pointer"
+              >
+                确认交接
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Modal to inspect structured Git delivery diffs without touching source files. */
 function LaneDeliveryDiffModal({
   batchId,
@@ -971,7 +1261,22 @@ function StateBadge({ state }: { state: ParallelBatch['state'] }) {
 
 function Lane({ worker, blocked }: { worker: ParallelWorker; blocked: boolean }) {
   const complete = worker.total > 0 && worker.done === worker.total;
-  const percent = worker.total === 0 ? 0 : Math.round((worker.done / worker.total) * 100);
+  const hasCountableProgress = worker.total > 0;
+  const percent = hasCountableProgress ? Math.round((worker.done / worker.total) * 100) : 0;
+
+  const taskSummary = worker.tasks?.map((t) => t.content).join(' ') || worker.scope || '';
+  const taskText = taskSummary.toLowerCase();
+  const phaseLabel = complete
+    ? '已完成交付'
+    : worker.running && !blocked
+    ? (/video|视频|字幕|帧/.test(taskText)
+        ? '正在分析字幕与关键画面...'
+        : /doc|spec|规范|文档|rfc/.test(taskText)
+        ? '正在阅读与比对规范原文...'
+        : '正在独立工作副本中执行...')
+    : blocked
+    ? '等待分工解除冲突'
+    : '准备就绪';
 
   return (
     <div className="flex items-start gap-2">
@@ -988,24 +1293,33 @@ function Lane({ worker, blocked }: { worker: ParallelWorker; blocked: boolean })
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-2xs font-medium text-foreground truncate">{worker.assignee}</span>
-          <span className="text-2xs tabular-nums text-muted-foreground shrink-0">
-            {worker.done}/{worker.total}
-          </span>
+          {hasCountableProgress ? (
+            <span className="text-2xs tabular-nums text-muted-foreground shrink-0">
+              {worker.done}/{worker.total} 项
+            </span>
+          ) : (
+            <span className="text-3xs text-muted-foreground shrink-0 font-sans">
+              {phaseLabel}
+            </span>
+          )}
         </div>
 
-        {/* The scope is the contract that lets this lane run beside the others,
-            so it is shown rather than hidden behind a tooltip. */}
-        <code className="block text-2xs text-muted-foreground truncate">{worker.scope}</code>
-
-        <div className="mt-1 h-1 rounded-full bg-border overflow-hidden">
-          <div
-            className={cn(
-              'h-full rounded-full transition-all duration-500',
-              complete ? 'bg-status-success' : blocked ? 'bg-status-warning' : 'bg-status-info'
-            )}
-            style={{ width: `${percent}%` }}
-          />
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <code className="text-2xs text-muted-foreground truncate">{worker.scope || '全工作区'}</code>
+          <span className="text-3xs text-foreground-muted font-sans truncate">· {phaseLabel}</span>
         </div>
+
+        {hasCountableProgress && (
+          <div className="mt-1 h-1 rounded-full bg-border overflow-hidden">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-500',
+                complete ? 'bg-status-success' : blocked ? 'bg-status-warning' : 'bg-status-info'
+              )}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1021,6 +1335,7 @@ interface CreateBatchProps {
 function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated }: CreateBatchProps) {
   const [agents, setAgents] = React.useState<AgentDefinition[]>([]);
   const [loadingAgents, setLoadingAgents] = React.useState(true);
+  const [isolationMode, setIsolationMode] = React.useState<'worktree' | 'directory'>(isIsolated ? 'worktree' : 'directory');
   const [workers, setWorkers] = React.useState<Array<{ agent_id: string; task: string; scope: string }>>([
     { agent_id: '', task: '', scope: '' },
     { agent_id: '', task: '', scope: '' },
@@ -1072,8 +1387,8 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isIsolated) {
-      toast.error('当前项目非 Git 仓库根目录，无法启动工作区隔离协作');
+    if (isolationMode === 'worktree' && !isIsolated) {
+      toast.error('当前项目非 Git 仓库根目录，无法启用独立工作副本隔离');
       return;
     }
     const emptyTaskIndex = workers.findIndex((w) => !w.task.trim());
@@ -1098,7 +1413,7 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
         })),
         review_agent: reviewerId,
         total_budget_tokens: parseInt(budgetTokens, 10) || 128000,
-        isolation: 'worktree',
+        isolation: isolationMode,
         ...(hasNative && nativeBudgetAcknowledged?{native_budget_policy:{mode:'native-managed' as const,acknowledged:true as const}}:{}),
         review_verification:verifyReview,
       });
@@ -1128,6 +1443,52 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
 
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs font-sans">
+          {/* Isolation mode selection */}
+          <div className="space-y-1.5 p-3 rounded-xl border border-border/70 bg-surface0/60">
+            <label className="text-2xs font-semibold text-foreground flex items-center justify-between">
+              <span>执行策略与环境隔离</span>
+              <span className="text-3xs text-muted-foreground font-normal">通用任务与代码任务可选不同策略</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <label className={cn(
+                'flex items-start gap-2 p-2.5 rounded-lg border text-2xs cursor-pointer transition-colors',
+                isolationMode === 'worktree' ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-surface1 text-muted-foreground',
+                !isIsolated && 'opacity-50 cursor-not-allowed'
+              )}>
+                <input
+                  type="radio"
+                  name="isolationMode"
+                  value="worktree"
+                  disabled={!isIsolated}
+                  checked={isolationMode === 'worktree'}
+                  onChange={() => setIsolationMode('worktree')}
+                  className="mt-0.5"
+                />
+                <div className="space-y-0.5">
+                  <span className="font-semibold block text-foreground">独立工作副本 (Git Worktree)</span>
+                  <span className="text-3xs block leading-snug">代码修改先保存在独立副本中，确认后合入项目。</span>
+                </div>
+              </label>
+
+              <label className={cn(
+                'flex items-start gap-2 p-2.5 rounded-lg border text-2xs cursor-pointer transition-colors',
+                isolationMode === 'directory' ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-surface1 text-muted-foreground'
+              )}>
+                <input
+                  type="radio"
+                  name="isolationMode"
+                  value="directory"
+                  checked={isolationMode === 'directory'}
+                  onChange={() => setIsolationMode('directory')}
+                  className="mt-0.5"
+                />
+                <div className="space-y-0.5">
+                  <span className="font-semibold block text-foreground">常规工作区目录</span>
+                  <span className="text-3xs block leading-snug">适合视频字幕与画面分析、文档比对等通用研究任务。</span>
+                </div>
+              </label>
+            </div>
+          </div>
           {!isIsolated && (
             <div className="p-3 rounded-lg border border-status-warning/40 bg-status-warning/10 text-status-warning flex items-start gap-2">
               <AlertTriangle className="size-4 shrink-0 mt-0.5" />
@@ -1142,7 +1503,7 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <span>并行子任务与执行 Agent 分配</span>
-                <span className="text-3xs text-muted-foreground font-normal">（每个任务将运行于独立的 Git Worktree）</span>
+                <span className="text-3xs text-muted-foreground font-normal">（{isolationMode === 'worktree' ? '每个任务将运行于独立工作副本' : '各任务在当前工作区并发执行'}）</span>
               </label>
               <button
                 type="button"
@@ -1267,7 +1628,7 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
             </button>
             <button
               type="submit"
-              disabled={submitting || !isIsolated || loadingAgents || (hasNative && !nativeBudgetAcknowledged)}
+              disabled={submitting || (isolationMode === 'worktree' && !isIsolated) || loadingAgents || (hasNative && !nativeBudgetAcknowledged)}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-xs"
             >
               {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <GitMerge className="size-3.5" />}

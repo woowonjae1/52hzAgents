@@ -1129,7 +1129,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
         }
 
         // Parallel batch lane actions
-        const laneActionMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/lanes\/([^/]+)\/(retry|review|send-back|complete)$/);
+        const laneActionMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/lanes\/([^/]+)\/(retry|review|send-back|complete|handoff)$/);
         if (laneActionMatch && req.method === 'POST') {
           const [, ws, batchId, rawAgent, action] = laneActionMatch;
           if (ws !== '52hz') return sendJson(res, 404, { error: 'Workspace not found.' });
@@ -1147,6 +1147,10 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
           if (action === 'send-back') {
             const body=await parseBody(req);
             return sendJson(res, 200, collaboration.sendBack(batchId, agent, body));
+          }
+          if (action === 'handoff') {
+            const body = await parseBody(req);
+            return sendJson(res, 200, collaboration.handoff(batchId, agent, body));
           }
           if (action === 'complete') {
             return sendJson(res, 409, { error: 'Lane completion is recorded by the actual Agent execution.' });
