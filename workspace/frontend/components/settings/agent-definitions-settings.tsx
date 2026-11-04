@@ -14,7 +14,6 @@ import {
   Terminal,
   Database,
   Cpu,
-  Layers,
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
@@ -42,29 +41,6 @@ import type { ConnectionItem } from './router-provider-settings';
 import { NativeAgentConnectionsPanel } from './native-agent-connections-panel';
 import { AgentSecondaryDetail } from './agent-secondary-detail';
 
-const agentStarters = [
-  {
-    name: '开发助手',
-    role: 'developer',
-    description: '分析实现方案，完成有权限执行的代码修改。',
-    instructions: '先读取项目规范与相关代码，给出范围明确的实现方案。仅在已获文件修改权限时编辑，命令执行必须遵守审批。报告实际完成的修改、验证结果和未完成项。',
-    permissions: { readFiles: true, writeFiles: true, executeCommands: true, knowledge: true, mcp: false, delegate: false },
-  },
-  {
-    name: '代码审阅',
-    role: 'reviewer',
-    description: '检查变更、潜在缺陷与回归风险，不修改代码。',
-    instructions: '检查项目与代码变更。优先报告有证据的缺陷、影响范围、文件位置及验证建议；区分确定的问题与待验证的推断，不声称执行未运行的检查。',
-    permissions: { readFiles: true, writeFiles: false, executeCommands: false, knowledge: true, mcp: false, delegate: false },
-  },
-  {
-    name: '测试验证',
-    role: 'tester',
-    description: '梳理测试场景，检查行为和交付证据。',
-    instructions: '根据需求检查实现与测试覆盖，设计能发现实际缺陷的验证场景。未获命令权限和审批时只做分析；获准执行后记录实际结果，不把模拟结果当作真实环境验收。',
-    permissions: { readFiles: true, writeFiles: false, executeCommands: true, knowledge: true, mcp: false, delegate: false },
-  },
-];
 
 interface AgentDefinitionsSettingsProps {
   onManageConnections?: () => void;
@@ -298,32 +274,22 @@ export function AgentDefinitionsSettings({
     void loadData();
   }, [loadData]);
 
-  const openCreate = (starter?: (typeof agentStarters)[number]) => {
+  const openCreate = () => {
     setFormRuntime('pi');
     setFormNativeConnectionId(null);
     setFormRuntimeModel('');
     setEditingAgent(null);
-    setFormName(starter?.name || '');
-    setFormRole(starter?.role || 'assistant');
-    setFormDescription(starter?.description || '');
-    setFormInstructions(starter?.instructions || '');
+    setFormName('');
+    setFormRole('assistant');
+    setFormDescription('');
+    setFormInstructions('');
     setFormStatus('active');
-    // Starter permissions or conservative defaults
-    if (starter?.permissions) {
-      setPermReadFiles(starter.permissions.readFiles);
-      setPermWriteFiles(starter.permissions.writeFiles);
-      setPermExecuteCommands(starter.permissions.executeCommands);
-      setPermKnowledge(starter.permissions.knowledge);
-      setPermMcp(starter.permissions.mcp);
-      setPermDelegate(starter.permissions.delegate);
-    } else {
-      setPermReadFiles(true);
-      setPermWriteFiles(false);
-      setPermExecuteCommands(false);
-      setPermKnowledge(true);
-      setPermMcp(false);
-      setPermDelegate(false);
-    }
+    setPermReadFiles(true);
+    setPermWriteFiles(false);
+    setPermExecuteCommands(false);
+    setPermKnowledge(true);
+    setPermMcp(false);
+    setPermDelegate(false);
 
     // Default resource if any connection exists
     if (connections.length > 0) {
@@ -980,39 +946,6 @@ export function AgentDefinitionsSettings({
         </div>
       )}
 
-      {/* Role Auxiliary Presets Section (Downgraded to auxiliary assistant) */}
-      {!loading && (
-        <section className="rounded-xl border border-border/70 bg-surface1/40 p-4 space-y-3" aria-label="职责辅助预设">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="size-3.5 text-primary" />
-              <h3 className="text-xs font-semibold text-foreground">职责辅助预设 (辅助模板)</h3>
-              <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
-                辅助填充，不新增真实客户端连接
-              </Badge>
-            </div>
-          </div>
-          <p className="text-2xs text-foreground-muted leading-relaxed">
-            职责辅助预设仅用于为 Agent 快速填充工作指令与安全权限模板（如开发助手、代码审阅、测试验证），不创建新的底层客户端连接。创建后可自由指定底层运行客户端。
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {agentStarters.map((starter) => (
-              <Button
-                key={starter.role}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => openCreate(starter)}
-                className="text-2xs h-7 gap-1"
-              >
-                <Plus className="size-3" />
-                <span>以「{starter.name}」预设新建</span>
-              </Button>
-            ))}
-          </div>
-          <p className="text-3xs text-foreground-extra-muted">以预设创建的 Agent 默认仅开放只读权限；修改项目文件与执行终端命令需在能力权限中单独开启并受执行前审批保护。</p>
-        </section>
-      )}
 
       {/* Edit / Create Form Modal */}
       {isEditing && (
